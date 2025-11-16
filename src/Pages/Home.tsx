@@ -47,19 +47,9 @@ export default function Home() {
             </Box>
 
             <CreateRoomForm />
+       
 
-            {/* <Grid container spacing={2}>
-                {MOCK_ROOMS.map((room) => (
-                    <Hall
-                        title={room.title}
-                        prizeAmount={room.prizeAmount}
-                        currency={room.currency}
-                        ticketsToStart={room.ticketsToStart}
-                        ticketPrice={room.ticketPrice}
-                        onEnter={() => handleEnter(room.id)}
-                    />
-                ))}
-            </Grid> */}
+
         </Container>
     );
 }

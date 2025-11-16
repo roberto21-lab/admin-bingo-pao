@@ -1,140 +1,103 @@
-// src/components/CreateRoomForm.tsx
 import * as React from "react";
 import {
-  Box, TextField, MenuItem, Select, InputLabel, FormControl,
-  FormControlLabel, Switch, Typography, InputAdornment, Button, Stack, Alert,
-  Grid, RadioGroup, Radio, FormLabel
+  Box, TextField, FormControl, InputLabel, Select, MenuItem,
+  Typography, Alert, Stack, InputAdornment, FormControlLabel, Switch,
+  FormLabel, Button
 } from "@mui/material";
 
-type PrizeModel = "fixed" | "percent";
+type PrizeModel = "percent" | "fixed";
 type PriceMode = "autoFromPrize" | "manual";
 
-type FormState = {
-  name: string;
-  currency: "Bs" | "USD";
-  ticketPrice: number | "";
-  minTicketsToStart: number | "";
-  maxTickets?: number | "";
-  maxPerPlayer?: number | "";
-  prizeModel: PrizeModel;
-  // --- FIXED MODEL ---
-  prizeFixedAmount?: number | "";
-  priceMode: PriceMode;        // ⬅️ NUEVO: auto/manual
-  ticketsBase: number;         // ⬅️ NUEVO: divisor (default 100)
-  // --- PERCENT MODEL ---
-  prizePercent: { horizontal: number; vertical: number; diagonal: number; full: number; };
-  commission: number; // %
-  scheduledAt?: string; // ISO local datetime
-  isPublic: boolean;
-  description?: string;
+type Pattern =
+  | "horizontal"
+  | "vertical"
+  | "diagonal"
+  | "cross_small"
+  | "cross_big"
+  | "full";
+
+const PATTERN_LABELS: Record<Pattern, string> = {
+  horizontal: "Horizontal",
+  vertical: "Vertical",
+  diagonal: "Diagonal",
+  cross_small: "Cruz pequeña",
+  cross_big: "Cruz grande",
+  full: "Full (cartón lleno)",
 };
 
-const DEFAULT_PERCENT = { horizontal: 15, vertical: 15, diagonal: 20, full: 50 };
+type RoundConfig = { pattern: Pattern; percent: number; };
 
-export default function CreateRoomForm({
-  onSubmit,
-}: {
-  onSubmit?: (payload: any) => void;
-}) {
-  const [state, setState] = React.useState<FormState>({
+const DEFAULT_ROUNDS: RoundConfig[] = [
+  { pattern: "horizontal", percent: 40 },
+  { pattern: "vertical",   percent: 30 },
+  { pattern: "full",       percent: 20 },
+];
+
+type State = {
+  name: string;
+  currency: "Bs" | "USD";
+  ticketPrice: number;
+  minTicketsToStart: number;
+  maxTickets?: number | "";
+  maxPerPlayer?: number | "";
+  commission: number; // % para la casa (10 por defecto)
+  prizeModel: PrizeModel;
+  priceMode: PriceMode;
+  scheduledAt?: string;
+  isPublic: boolean;
+  description?: string;
+
+  rounds: RoundConfig[]; // 3 rondas
+  ticketsPreview: number;
+};
+
+export default function CrearSalaFormFlex() {
+  const [error, setError] = React.useState<string | null>(null);
+  const [state, setState] = React.useState<State>({
     name: "",
-    currency: "Bs",
-    ticketPrice: "",
-    minTicketsToStart: "",
+    currency: "USD",
+    ticketPrice: 1,
+    minTicketsToStart: 10,
     maxTickets: "",
     maxPerPlayer: "",
-    prizeModel: "percent",
-    prizeFixedAmount: "",
-    priceMode: "autoFromPrize", // ⬅️ por defecto, calculado
-    ticketsBase: 100,           // ⬅️ por defecto, 100 cartones
-    prizePercent: { ...DEFAULT_PERCENT },
     commission: 10,
+    prizeModel: "percent",
+    priceMode: "manual",
     scheduledAt: "",
     isPublic: true,
     description: "",
+    rounds: DEFAULT_ROUNDS,
+    ticketsPreview: 100,
   });
 
-  const [error, setError] = React.useState<string>("");
-
-  const percentSum =
-    state.prizePercent.horizontal +
-    state.prizePercent.vertical +
-    state.prizePercent.diagonal +
-    state.prizePercent.full;
-
-  const handleChange = (key: keyof FormState, value: any) =>
+  const handleChange = <K extends keyof State>(key: K, value: State[K]) =>
     setState((s) => ({ ...s, [key]: value }));
 
-  const handlePercentChange = (k: keyof FormState["prizePercent"], v: number) =>
-    setState((s) => ({ ...s, prizePercent: { ...s.prizePercent, [k]: v } }));
+  const handleRoundChange = (idx: number, patch: Partial<RoundConfig>) =>
+    setState((s) => {
+      const rounds = s.rounds.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+      return { ...s, rounds };
+    });
 
-  // ⬅️ Auto-cálculo: ticketPrice = premio / ticketsBase (si fixed + autoFromPrize)
-  React.useEffect(() => {
-    if (
-      state.prizeModel === "fixed" &&
-      state.priceMode === "autoFromPrize" &&
-      state.prizeFixedAmount &&
-      state.ticketsBase > 0
-    ) {
-      const price = Number(state.prizeFixedAmount) / Number(state.ticketsBase);
-      // redondeo a 2 decimales, ajusta si quieres más precisión
-      const rounded = Math.round(price * 100) / 100;
-      setState((s) => ({ ...s, ticketPrice: isFinite(rounded) ? rounded : "" }));
-    }
-  }, [state.prizeModel, state.priceMode, state.prizeFixedAmount, state.ticketsBase]);
+  const percentToWinners = 100 - state.commission;
+  const roundsSum = state.rounds.reduce((acc, r) => acc + (Number(r.percent) || 0), 0);
+  const roundsValid = roundsSum === percentToWinners;
 
-  const submit = (e: React.FormEvent) => {
-    console.log('=============', e)
-    e.preventDefault();
-    setError("");
-
-    // Validaciones mínimas
-    if (!state.name.trim()) return setError("El nombre de la sala es requerido.");
-    if (!state.ticketPrice || Number(state.ticketPrice) <= 0)
-      return setError("El precio del cartón debe ser mayor a 0.");
-    if (!state.minTicketsToStart || Number(state.minTicketsToStart) <= 0)
-      return setError("El mínimo de cartones para iniciar debe ser mayor a 0.");
-
-    if (state.prizeModel === "fixed") {
-      if (!state.prizeFixedAmount || Number(state.prizeFixedAmount) <= 0)
-        return setError("El premio fijo debe ser mayor a 0.");
-      if (state.priceMode === "autoFromPrize" && (!state.ticketsBase || state.ticketsBase <= 0))
-        return setError("Los cartones base deben ser mayores a 0.");
-    } else {
-      if (percentSum !== 100)
-        return setError("La distribución por porcentaje debe sumar 100%.");
-    }
-
-    const payload = {
-      name: state.name.trim(),
-      currency: state.currency,
-      ticketPrice: Number(state.ticketPrice),
-      minTicketsToStart: Number(state.minTicketsToStart),
-      maxTickets: state.maxTickets ? Number(state.maxTickets) : undefined,
-      maxPerPlayer: state.maxPerPlayer ? Number(state.maxPerPlayer) : undefined,
-      commissionPercent: Number(state.commission),
-      prize:
-        state.prizeModel === "fixed"
-          ? {
-              model: "fixed" as const,
-              total: Number(state.prizeFixedAmount),
-              priceMode: state.priceMode,
-              ticketsBase: state.ticketsBase,
-            }
-          : {
-              model: "percent" as const,
-              distribution: { ...state.prizePercent },
-            },
-      scheduledAt: state.scheduledAt || undefined,
-      isPublic: state.isPublic,
-      description: state.description?.trim() || undefined,
-    };
-    console.log('payload', payload)
-    if (onSubmit) onSubmit(payload);
-    else console.log("CreateRoom payload:", payload);
-  };
+  const potPreview = (Number(state.ticketsPreview) || 0) * (Number(state.ticketPrice) || 0);
+  const houseCut = (potPreview * state.commission) / 100;
+  const potForWinners = potPreview - houseCut;
 
   const currencySymbol = state.currency === "USD" ? "$" : "Bs";
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roundsValid) {
+      setError(`La suma de % de rondas debe ser ${percentToWinners}% (actual: ${roundsSum}%).`);
+      return;
+    }
+    setError(null);
+    // TODO: enviar "state" a tu acción de creación
+  };
 
   return (
     <Box component="form" onSubmit={submit} noValidate sx={{ maxWidth: 1000 }}>
@@ -142,237 +105,211 @@ export default function CreateRoomForm({
         Crear sala
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Grid container spacing={2}>
-        {/* Nombre */}
-          <TextField
-            label="Nombre de la sala"
-            fullWidth
-            value={state.name}
-            onChange={(e) => handleChange("name", e.target.value)}
-          />
-
-        {/* Moneda */}
-          <FormControl fullWidth>
-            <InputLabel>Moneda</InputLabel>
-            <Select
-              label="Moneda"
-              value={state.currency}
-              onChange={(e) => handleChange("currency", e.target.value)}
-            >
-              <MenuItem value="Bs">Bs</MenuItem>
-              <MenuItem value="USD">USD</MenuItem>
-            </Select>
-          </FormControl>
-
-        {/* Precio del cartón */}
-          <TextField
-            label="Precio del cartón"
-            type="number"
-            fullWidth
-            value={state.ticketPrice}
-            onChange={(e) => handleChange("ticketPrice", Number(e.target.value))}
-            InputProps={{
-              startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
-              inputProps: { min: 0, step: "any" },
-            }}
-            disabled={state.prizeModel === "fixed" && state.priceMode === "autoFromPrize"}
-            helperText={
-              state.prizeModel === "fixed" && state.priceMode === "autoFromPrize"
-                ? `Se calcula como ${currencySymbol}${state.prizeFixedAmount || 0} ÷ ${
-                    state.ticketsBase
-                  }`
-                : undefined
-            }
-          />
-
-        {/* Mínimo para iniciar */}
-          <TextField
-            label="Mín. cartones para iniciar"
-            type="number"
-            fullWidth
-            value={state.minTicketsToStart}
-            onChange={(e) => handleChange("minTicketsToStart", Number(e.target.value))}
-            InputProps={{ inputProps: { min: 1, step: 1 } }}
-          />
-
-        {/* Máximo y límite por jugador */}
-          <TextField
-            label="Máx. cartones (opcional)"
-            type="number"
-            fullWidth
-            value={state.maxTickets}
-            onChange={(e) => handleChange("maxTickets", Number(e.target.value))}
-            InputProps={{ inputProps: { min: 1, step: 1 } }}
-          />
-
-          <TextField
-            label="Límite por jugador (opcional)"
-            type="number"
-            fullWidth
-            value={state.maxPerPlayer}
-            onChange={(e) => handleChange("maxPerPlayer", Number(e.target.value))}
-            InputProps={{ inputProps: { min: 1, step: 1 } }}
-          />
-
-        {/* Comisión */}
-          <TextField
-            label="Comisión sala (%)"
-            type="number"
-            fullWidth
-            value={state.commission}
-            onChange={(e) => handleChange("commission", Number(e.target.value))}
-            InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
-          />
-
-        {/* Modelo de premio */}
-          <FormControl fullWidth>
-            <InputLabel>Modelo de premio</InputLabel>
-            <Select
-              label="Modelo de premio"
-              value={state.prizeModel}
-              onChange={(e) => handleChange("prizeModel", e.target.value as PrizeModel)}
-            >
-              <MenuItem value="fixed">Fijo (monto total)</MenuItem>
-              <MenuItem value="percent">Porcentaje del bote</MenuItem>
-            </Select>
-          </FormControl>
-
-        {/* Si es premio fijo: monto + modo cálculo + tickets base */}
-        {state.prizeModel === "fixed" ? (
-          <>
-              <TextField
-                label="Premio total (fijo)"
-                type="number"
-                fullWidth
-                value={state.prizeFixedAmount}
-                onChange={(e) => handleChange("prizeFixedAmount", Number(e.target.value))}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
-                  inputProps: { min: 0, step: "any" },
-                }}
-              />
-
-              <FormLabel component="legend" sx={{ mb: 1 }}>
-                Cálculo del precio del cartón
-              </FormLabel>
-              <RadioGroup
-                row
-                value={state.priceMode}
-                onChange={(_, v) => handleChange("priceMode", v as PriceMode)}
-              >
-                <FormControlLabel
-                  value="autoFromPrize"
-                  control={<Radio />}
-                  label={`Desde premio: precio = ${currencySymbol}premio ÷ cartones base`}
-                />
-                <FormControlLabel value="manual" control={<Radio />} label="Manual" />
-              </RadioGroup>
-
-              <TextField
-                label="Cartones base"
-                type="number"
-                fullWidth
-                value={state.ticketsBase}
-                onChange={(e) => handleChange("ticketsBase", Number(e.target.value))}
-                InputProps={{ inputProps: { min: 1, step: 1 } }}
-                disabled={state.priceMode !== "autoFromPrize"}
-                helperText={
-                  state.priceMode === "autoFromPrize"
-                    ? `Ej.: ${currencySymbol}${state.prizeFixedAmount || 0} ÷ ${
-                        state.ticketsBase
-                      } = ${currencySymbol}${state.ticketPrice || 0}`
-                    : undefined
-                }
-              />
-          </>
-        ) : (
-          <>
-            {/* Porcentaje del bote */}
-              <TextField
-                label="Horizontal (%)"
-                type="number"
-                fullWidth
-                value={state.prizePercent.horizontal}
-                onChange={(e) => handlePercentChange("horizontal", Number(e.target.value))}
-                InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
-              />
-              <TextField
-                label="Vertical (%)"
-                type="number"
-                fullWidth
-                value={state.prizePercent.vertical}
-                onChange={(e) => handlePercentChange("vertical", Number(e.target.value))}
-                InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
-              />
-              <TextField
-                label="Diagonal (%)"
-                type="number"
-                fullWidth
-                value={state.prizePercent.diagonal}
-                onChange={(e) => handlePercentChange("diagonal", Number(e.target.value))}
-                InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
-              />
-              <TextField
-                label="Full (%)"
-                type="number"
-                fullWidth
-                value={state.prizePercent.full}
-                onChange={(e) => handlePercentChange("full", Number(e.target.value))}
-                InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
-              />
-              <Typography variant="caption" color={percentSum === 100 ? "success.main" : "error"}>
-                Suma actual: {percentSum}% {percentSum !== 100 && "— debe sumar 100%"}
-              </Typography>
-          </>
-        )}
-
-        {/* Programación / Pública */}
-          <TextField
-            label="Programar inicio (opcional)"
-            type="datetime-local"
-            fullWidth
-            value={state.scheduledAt}
-            onChange={(e) => handleChange("scheduledAt", e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={state.isPublic}
-                onChange={(e) => handleChange("isPublic", e.target.checked)}
-              />
-            }
-            label="Sala pública (visible en el hall)"
-          />
-
-        {/* Descripción */}
-          <TextField
-            label="Descripción (opcional)"
-            multiline
-            minRows={2}
-            fullWidth
-            value={state.description}
-            onChange={(e) => handleChange("description", e.target.value)}
-          />
-      </Grid>
-
-      <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
-        <Button type="submit" variant="contained">Crear sala</Button>
-        {state.prizeModel === "percent" && (
-          <Button
-            type="button"
-            onClick={() => setState((s) => ({ ...s, prizePercent: { ...DEFAULT_PERCENT } }))}
+      {/* Fila 1: Nombre / Moneda / Precio */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+        <TextField
+          label="Nombre de la sala"
+          fullWidth
+          value={state.name}
+          onChange={(e) => handleChange("name", e.target.value)}
+        />
+        <FormControl sx={{ minWidth: { sm: 180 } }}>
+          <InputLabel>Moneda</InputLabel>
+          <Select
+            label="Moneda"
+            value={state.currency}
+            onChange={(e) => handleChange("currency", e.target.value as State["currency"])}
           >
-            Reset % premios
-          </Button>
-        )}
+            <MenuItem value="Bs">Bs</MenuItem>
+            <MenuItem value="USD">USD</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          label="Precio del cartón"
+          type="number"
+          value={state.ticketPrice}
+          onChange={(e) => handleChange("ticketPrice", Number(e.target.value))}
+          InputProps={{
+            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+            inputProps: { min: 0, step: "any" },
+          }}
+          sx={{ minWidth: { sm: 220 } }}
+        />
+      </Stack>
+
+      {/* Fila 2: Mín / Máx / Límite jugador */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+        <TextField
+          label="Mín. cartones para iniciar"
+          type="number"
+          value={state.minTicketsToStart}
+          onChange={(e) => handleChange("minTicketsToStart", Number(e.target.value))}
+          InputProps={{ inputProps: { min: 1, step: 1 } }}
+        />
+        <TextField
+          label="Máx. cartones (opcional)"
+          type="number"
+          value={state.maxTickets}
+          onChange={(e) =>
+            handleChange("maxTickets", e.target.value === "" ? "" : Number(e.target.value))
+          }
+          InputProps={{ inputProps: { min: 1, step: 1 } }}
+        />
+        <TextField
+          label="Límite por jugador (opcional)"
+          type="number"
+          value={state.maxPerPlayer}
+          onChange={(e) =>
+            handleChange("maxPerPlayer", e.target.value === "" ? "" : Number(e.target.value))
+          }
+          InputProps={{ inputProps: { min: 1, step: 1 } }}
+        />
+      </Stack>
+
+      {/* Fila 3: Comisión */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+        <TextField
+          label="Comisión sala (%)"
+          type="number"
+          value={state.commission}
+          onChange={(e) => handleChange("commission", Number(e.target.value))}
+          InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
+          helperText="Por defecto 10% (casa)"
+          sx={{ maxWidth: { sm: 240 } }}
+        />
+      </Stack>
+
+      {/* Premios / Rondas */}
+      <FormLabel sx={{ mb: 1.5, display: "block", fontWeight: 700 }}>
+        Premios (3 ganadores) — repartir {percentToWinners}% del bote
+      </FormLabel>
+
+      <Stack spacing={1.5} sx={{ mb: 1 }}>
+        {state.rounds.map((r, idx) => (
+          <Stack
+            key={idx}
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            alignItems={{ sm: "center" }}
+          >
+            <FormControl sx={{ minWidth: { sm: 260 }, flex: 1 }}>
+              <InputLabel>{`Ronda ${idx + 1} — Patrón`}</InputLabel>
+              <Select
+                label={`Ronda ${idx + 1} — Patrón`}
+                value={r.pattern}
+                onChange={(e) =>
+                  handleRoundChange(idx, { pattern: e.target.value as Pattern })
+                }
+              >
+                {Object.entries(PATTERN_LABELS).map(([val, label]) => (
+                  <MenuItem key={val} value={val}>{label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <TextField
+              label={`Ronda ${idx + 1} — %`}
+              type="number"
+              value={r.percent}
+              onChange={(e) => handleRoundChange(idx, { percent: Number(e.target.value) })}
+              InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
+              sx={{ width: { sm: 180 } }}
+            />
+          </Stack>
+        ))}
+      </Stack>
+
+      <Typography
+        variant="caption"
+        color={roundsValid ? "success.main" : "error"}
+        sx={{ display: "block", mb: 2 }}
+      >
+        Suma premios: {roundsSum}% — Debe ser {percentToWinners}% (100% - comisión)
+      </Typography>
+
+      {/* Programación / Pública */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+        <TextField
+          label="Programar inicio (opcional)"
+          type="datetime-local"
+          value={state.scheduledAt}
+          onChange={(e) => handleChange("scheduledAt", e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: { sm: 280 } }}
+        />
+        <FormControlLabel
+          control={
+            <Switch
+              checked={state.isPublic}
+              onChange={(e) => handleChange("isPublic", e.target.checked)}
+            />
+          }
+          label="Sala pública (visible en el hall)"
+          sx={{ ml: { sm: 1 } }}
+        />
+      </Stack>
+
+      {/* Descripción */}
+      <TextField
+        label="Descripción (opcional)"
+        multiline
+        minRows={2}
+        fullWidth
+        value={state.description}
+        onChange={(e) => handleChange("description", e.target.value)}
+        sx={{ mb: 2 }}
+      />
+
+      {/* Vista previa del bote */}
+      <Box
+        sx={{
+          mt: 1,
+          p: 2,
+          borderRadius: 2,
+          bgcolor: "background.paper",
+          border: (t) => `1px solid ${t.palette.divider}`,
+        }}
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
+          <TextField
+            label="Tickets (preview)"
+            type="number"
+            value={state.ticketsPreview}
+            onChange={(e) => handleChange("ticketsPreview", Number(e.target.value))}
+            InputProps={{ inputProps: { min: 0, step: 1 } }}
+            sx={{ width: { sm: 200 } }}
+          />
+          <Typography variant="body2" sx={{ flex: 1 }}>
+            Bote = {state.ticketsPreview} × {currencySymbol}{state.ticketPrice} ={" "}
+            <b>{currencySymbol}{(potPreview || 0).toFixed(2)}</b> | Casa ({state.commission}%) ={" "}
+            <b>{currencySymbol}{houseCut.toFixed(2)}</b> | Para premios ={" "}
+            <b>{currencySymbol}{potForWinners.toFixed(2)}</b>
+          </Typography>
+        </Stack>
+
+        <Stack spacing={0.5} sx={{ mt: 1 }}>
+          {state.rounds.map((r, i) => (
+            <Typography key={i} variant="caption">
+              Ronda {i + 1} ({PATTERN_LABELS[r.pattern]}): {r.percent}% →{" "}
+              <b>
+                {currencySymbol}
+                {((potForWinners * r.percent) / percentToWinners || 0).toFixed(2)}
+              </b>
+            </Typography>
+          ))}
+        </Stack>
+      </Box>
+
+      {/* Acciones */}
+      <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
+        <Button type="submit" variant="contained" disabled={!roundsValid}>
+          Crear sala
+        </Button>
+        <Button type="button" variant="outlined" onClick={() => handleChange("rounds", DEFAULT_ROUNDS)}>
+          Reset premios
+        </Button>
       </Stack>
     </Box>
   );

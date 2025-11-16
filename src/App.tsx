@@ -1,20 +1,19 @@
 // src/App.tsx
-import * as React from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import Home from "./Pages/Home";
+import { Route, Routes, useNavigate } from "react-router-dom";
 import Footer from "./components/Footer";
+import Home from "./Pages/Home";
+import Register from "./Pages/Register";
 import Rooms from "./Pages/Rooms";
 import UserPurchaseDetail from "./Pages/UserPurchaseDetail";
-// import Home from "./Pages/Home";
-// import Header from "./Pages/Header";
-// import RoomDetail from "./Pages/RoomDetail";
-// import PurchasedCartons from "./Pages/PurchasedCartons";
-// import Header from "./components/Header"; // asegúrate de la ruta real
+import { ThemeProvider } from "@emotion/react";
+import theme from "./theme";
+import { CssBaseline } from "@mui/material";
+import React from "react";
+import  Login  from "./Pages/Login";
 
-// Componente 404 simple (puedes moverlo a src/Pages/NotFound.tsx luego)
 function NotFound() {
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui" }}>
+    <div style={{ fontFamily: "system-ui" }}>
       <h2>404 — Página no encontrada</h2>
       <p>La ruta que intentas abrir no existe.</p>
     </div>
@@ -23,39 +22,32 @@ function NotFound() {
 
 export default function App() {
   const navigate = useNavigate();
+  const [seeFooter, setSeeFooter] = React.useState(true);
 
   return (
-    <>
-      {/* <Header
-        title="Bingo Pao"
-        links={[
-          { label: "Inicio", to: "/" },
-          // agrega más links cuando existan rutas
-          // { label: "Salas", to: "/rooms" },
-          // { label: "Reglas", to: "/rules" },
-        ]}
-        onNavigate={(to) => navigate(to)}
-        actionLabel="Crear sala"
-        onActionClick={() => alert("Crear sala (próximamente)")}
-        roomCount={2}
-      /> */}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
 
-         <div style={{ paddingBottom: 72 }}>{/* espacio para el footer fijo */}
-        <Routes>
-          <Route path="/" element={<Home />} />
-          {/* <Route path="/create-room" element={<CreateRoom />} /> */}
-          <Route path="/rooms" element={<Rooms />} />
-          <Route path="/purchase/:id" element={<UserPurchaseDetail />} />
-        </Routes>
+{/* Login */}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/rooms" element={<Rooms />} />
+        <Route path="/purchase/:id" element={<UserPurchaseDetail />} />
+        <Route path="/register-user" element={<Register />} />
+        <Route path="/login" element={<Login />} />
+      </Routes>
+      {
+        seeFooter && (
+          <Footer
+            createTo="/"
+            otherTo="/rooms"
+            createLabel="Crear sala"
+            otherLabel="Salas"
+          />
+        )
+      }
 
+    </ThemeProvider>
 
-      </div>
-       <Footer
-        createTo="/"
-        otherTo="/rooms"
-        createLabel="Crear sala"
-        otherLabel="Salas"
-      />
-    </>
   );
 }
