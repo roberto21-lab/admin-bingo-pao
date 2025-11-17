@@ -1,77 +1,66 @@
-import * as React from 'react';
+// src/Pages/RegisterUser.tsx
+import * as React from "react";
 import {
+    Alert,
     Box,
-    Container,
-    Paper,
-    Typography,
-    TextField,
     Button,
-    Stack,
-    FormControlLabel,
-    Checkbox,
+    Container,
     IconButton,
     InputAdornment,
-    Link,
-    Divider,
-} from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import BingoLogo from '../components/BingoLogo';
+    LinearProgress,
+    Paper,
+    Stack,
+    TextField,
+    Typography,
+    Snackbar,
+} from "@mui/material";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import { useNavigate } from "react-router-dom";
+import { createUser } from "../Services/users.service";
+// import { createUser } from "../Services/users.service";
 
-// arriba del componente
-const gold = '#d6bf7b';
-const textFieldSx = {
-    '& .MuiOutlinedInput-root': {
-        bgcolor: '#fff',           // fondo del input
-        borderRadius: 2,
-        // borde visible en reposo
-        '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'rgba(214,191,123,0.65)', // dorado tenue
-            borderWidth: 2,
-        },
-        // hover
-        '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: gold,
-        },
-        // focus
-        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#c79b36',
-            boxShadow: '0 0 0 3px rgba(214,172,75,0.18)',
-        },
-    },
-    // color del label
-    '& .MuiInputLabel-root': {
-        color: '#a89563',
-    },
-    '& .MuiInputLabel-root.Mui-focused': {
-        color: '#c79b36',
-    },
-    // placeholder (si usas placeholder en vez de label)
-    '& input::placeholder': {
-        color: '#b9a873',
-        opacity: 1,
-    },
-};
+const gold = "#d6bf7b";
+// const textFieldSx = {
+//     "& .MuiOutlinedInput-root": {
+//         bgcolor: "#fff",
+//         borderRadius: 2,
+//         "& .MuiOutlinedInput-notchedOutline": {
+//             borderColor: "rgba(214,191,123,0.65)",
+//             borderWidth: 2,
+//         },
+//         "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: gold },
+//         "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+//             borderColor: "#c79b36",
+//             boxShadow: "0 0 0 3px rgba(214,172,75,0.18)",
+//         },
+//     },
+//     "& .MuiInputLabel-root": { color: "#a89563" },
+//     "& .MuiInputLabel-root.Mui-focused": { color: "#c79b36" },
+// };
 
+export default function RegisterUser() {
+    const navigate = useNavigate();
 
-export default function RegisterPage() {
     const [values, setValues] = React.useState({
-        fullName: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        acceptTerms: false,
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
     });
-
     const [showPw, setShowPw] = React.useState(false);
     const [showPw2, setShowPw2] = React.useState(false);
     const [loading, setLoading] = React.useState(false);
     const [errors, setErrors] = React.useState<Record<string, string | false>>({});
     const [serverError, setServerError] = React.useState<string | null>(null);
+    const [snack, setSnack] = React.useState<{ open: boolean; msg: string }>({
+        open: false,
+        msg: "",
+    });
 
     const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, type, checked } = e.target;
-        setValues((s) => ({ ...s, [name]: type === 'checkbox' ? checked : value }));
+        const { name, value } = e.target;
+        setValues((s) => ({ ...s, [name]: value }));
     };
 
     const validateEmail = (email: string) =>
@@ -79,19 +68,16 @@ export default function RegisterPage() {
 
     const validate = () => {
         const errs: Record<string, string | false> = {};
-        if (!values.fullName.trim()) errs.fullName = 'Nombre completo requerido';
-        if (!values.email.trim()) errs.email = 'Correo requerido';
-        else if (!validateEmail(values.email)) errs.email = 'Correo inválido';
+        if (!values.name.trim()) errs.name = "Nombre completo requerido";
+        if (!values.email.trim()) errs.email = "Correo requerido";
+        else if (!validateEmail(values.email)) errs.email = "Correo inválido";
 
-        if (!values.password) errs.password = 'Contraseña requerida';
-        else if (values.password.length < 8)
-            errs.password = 'Mínimo 8 caracteres';
+        if (!values.password) errs.password = "Contraseña requerida";
+        else if (values.password.length < 8) errs.password = "Mínimo 8 caracteres";
 
-        if (!values.confirmPassword) errs.confirmPassword = 'Confirma la contraseña';
+        if (!values.confirmPassword) errs.confirmPassword = "Confirma la contraseña";
         else if (values.password !== values.confirmPassword)
-            errs.confirmPassword = 'Las contraseñas no coinciden';
-
-        if (!values.acceptTerms) errs.acceptTerms = 'Debes aceptar los términos';
+            errs.confirmPassword = "Las contraseñas no coinciden";
 
         setErrors(errs);
         return Object.values(errs).every((v) => !v);
@@ -104,188 +90,184 @@ export default function RegisterPage() {
 
         try {
             setLoading(true);
-            // const res = await AuthService.register({
-            //   fullName: values.fullName,
-            //   email: values.email,
-            //   password: values.password,
-            // });
-            await new Promise((r) => setTimeout(r, 800)); // Simulación
-            // Redirige al login o dashboard
-            // navigate('/login');
-            alert('¡Cuenta creada!');
+            await createUser({
+                name: values.name.trim(),
+                email: values.email.trim().toLowerCase(),
+                password: values.password,
+            });
+            setSnack({ open: true, msg: "¡Usuario creado con éxito!" });
+            setValues({ name: "", email: "", password: "", confirmPassword: "" });
+            setTimeout(() => navigate("/users"), 600);
         } catch (err: any) {
-            setServerError(err?.message || 'Error al registrar');
+            const msg =
+                err?.response?.data?.message || err?.message || "Error al crear el usuario";
+            setServerError(msg);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Box
-            sx={{
-                // minHeight: '100vh',
-                display: 'grid',
-                placeItems: 'center',
-                px: 2,
-                background:
-                    'radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.06), transparent 60%), linear-gradient(180deg, #0b1220, #0a0f1a 40%, #0b1020)',
-            }}
-        >
-
-            <Stack spacing={1.2} textAlign="center">
+        <Box >
+            {/* Título al estilo de “Crear Nueva sala…” */}
+            <Container >
                 <Typography
+                    variant="h4"
+                    align="center"
                     sx={{
-                        fontSize: { xs: 44, sm: 64 },
                         fontWeight: 900,
-                        letterSpacing: '0.14em',
-                        lineHeight: 1,
-                        color: '#FFFFFF',
-                        textTransform: 'uppercase',
+                        letterSpacing: ".04em",
+                        color: "#EDEDED",
+                        textTransform: "uppercase",
                     }}
                 >
-                    BINGO
+                    Crear nuevo usuario
                 </Typography>
+            </Container>
 
-
-                <Box sx={{ textAlign: "center", mb: 4 }}>
-                        <BingoLogo size={120} />
-                </Box>
-
+            {/* barra superior con botón al listado */}
+            <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 2 }}
+            >
                 <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 800, color: "#EDEDED" }}
+                >
+                    Datos del usuario
+                </Typography>
+
+                <Button
+                    variant="outlined"
+                    onClick={() => navigate("/users")}
                     sx={{
-                        fontSize: { xs: 22, sm: 28 },
-                        fontWeight: 800,
-                        color: '#EDEDED',
-                        mt: 1,
+                        borderColor: "rgba(214,191,123,0.65)",
+                        color: gold,
+                        fontWeight: 700,
+                        "&:hover": { borderColor: gold, background: "rgba(214,191,123,.08)" },
                     }}
                 >
-                    Registra nuevo Usuario
-                </Typography>
+                    Ir al listado
+                </Button>
             </Stack>
 
+            {loading && <LinearProgress sx={{ mb: 2 }} />}
 
+            {serverError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {serverError}
+                </Alert>
+            )}
 
-            <Container maxWidth="sm">
-                {/* 👉 CARD BLANCA */}
-                <Paper
-                    elevation={8}
-                    sx={{
-                        p: { xs: 3, sm: 4 },
-                        borderRadius: 5,
-                        bgcolor: '#fff',
-                        boxShadow: '0 16px 48px rgba(0,0,0,.25)',
-                    }}
-                >
-                    <Stack spacing={3} component="form" onSubmit={handleSubmit}>
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+                <Stack spacing={2.2}>
+                    <TextField
+                        name="name"
+                        label="Nombre completo"
+                        value={values.name}
+                        onChange={onChange}
+                        fullWidth
+                        autoComplete="name"
+                        error={!!errors.name}
+                        helperText={errors.name || " "}
+                    />
 
+                    <TextField
+                        name="email"
+                        label="Correo electrónico"
+                        type="email"
+                        value={values.email}
+                        onChange={onChange}
+                        fullWidth
+                        autoComplete="email"
+                        error={!!errors.email}
+                        helperText={errors.email || " "}
+                    />
 
-                        {serverError && (
-                            <Typography color="error" textAlign="center">
-                                {serverError}
-                            </Typography>
-                        )}
+                    <TextField
+                        name="password"
+                        label="Contraseña"
+                        type={showPw ? "text" : "password"}
+                        value={values.password}
+                        onChange={onChange}
+                        fullWidth
+                        autoComplete="new-password"
+                        error={!!errors.password}
+                        helperText={errors.password || "Mínimo 8 caracteres"}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        type="button"
+                                        edge="end"
+                                        onClick={() => setShowPw(v => !v)}
+                                        sx={{ color: "#8c7a3a" }}
+                                        aria-label="mostrar/ocultar contraseña"
+                                    >
+                                        {showPw ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
 
-                        {/* 👉 Inputs blancos */}
-                        <TextField
-                            name="fullName"
-                            label="Nombre completo"
-                            value={values.fullName}
-                            onChange={onChange}
-                            fullWidth
-                            autoComplete="name"
-                            error={!!errors.fullName}
-                            helperText={errors.fullName || ' '}
-                            sx={textFieldSx}
-                        />
+                    <TextField
+                        name="confirmPassword"
+                        label="Repite tu contraseña"
+                        type={showPw2 ? "text" : "password"}
+                        value={values.confirmPassword}
+                        onChange={onChange}
+                        fullWidth
+                        autoComplete="new-password"
+                        error={!!errors.confirmPassword}
+                        helperText={errors.confirmPassword || " "}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        type="button"
+                                        edge="end"
+                                        onClick={() => setShowPw2(v => !v)}
+                                        sx={{ color: "#8c7a3a" }}
+                                        aria-label="mostrar/ocultar confirmación"
+                                    >
+                                        {showPw2 ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
 
-                        <TextField
-                            name="email"
-                            label="Email"
-                            type="email"
-                            value={values.email}
-                            onChange={onChange}
-                            fullWidth
-                            autoComplete="email"
-                            error={!!errors.email}
-                            helperText={errors.email || ' '}
-                            sx={textFieldSx}
-                        />
+                    {/* ✅ sin onClick; usa type="submit" */}
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={loading}
+                        sx={{
+                            mt: 0.5, py: 1.3, fontWeight: 800, borderRadius: 999, textTransform: "none",
+                            fontSize: "1.05rem",
+                            background: "linear-gradient(180deg, #f3d08a 0%, #d6ac4b 100%)",
+                            color: "#0b0f1a",
+                            boxShadow: "0 8px 20px rgba(214,172,75,0.35)",
+                            "&:hover": {
+                                background: "linear-gradient(180deg, #f0c56d 0%, #c79b36 100%)",
+                                boxShadow: "0 10px 24px rgba(214,172,75,0.45)",
+                            },
+                        }}
+                    >
+                        {loading ? "Creando..." : "Crear cuenta"}
+                    </Button>
+                </Stack>
+            </Box>
 
-                        <TextField
-                            name="password"
-                            label="Contraseña"
-                            type={showPw ? 'text' : 'password'}
-                            value={values.password}
-                            onChange={onChange}
-                            fullWidth
-                            autoComplete="new-password"
-                            error={!!errors.password}
-                            helperText={errors.password || 'Mínimo 8 caracteres'}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton edge="end" sx={{ color: '#8c7a3a' }}>
-                                            {showPw ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={textFieldSx}
-                        />
-
-                        <TextField
-                            name="confirmPassword"
-                            label="Confirma tu contraseña"
-                            type={showPw2 ? 'text' : 'password'}
-                            value={values.confirmPassword}
-                            onChange={onChange}
-                            fullWidth
-                            autoComplete="new-password"
-                            error={!!errors.confirmPassword}
-                            helperText={errors.confirmPassword || ' '}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton edge="end" sx={{ color: '#8c7a3a' }}>
-                                            {showPw2 ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={textFieldSx}
-                        />
-
-
-                    
-                     
-
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={loading}
-                            sx={{
-                                py: 1.4,
-                                fontWeight: 700,
-                                borderRadius: 999,
-                                textTransform: 'none',
-                                fontSize: '1.05rem',
-                                background: 'linear-gradient(180deg, #f3d08a 0%, #d6ac4b 100%)',
-                                color: '#0b0f1a',
-                                boxShadow: '0 8px 20px rgba(214,172,75,0.35)',
-                                '&:hover': {
-                                    background: 'linear-gradient(180deg, #f0c56d 0%, #c79b36 100%)',
-                                    boxShadow: '0 10px 24px rgba(214,172,75,0.45)',
-                                },
-                            }}
-                        >
-                            {loading ? 'Creating...' : 'Create Account'}
-                        </Button>
-
-                       
-                    </Stack>
-                </Paper>
-            </Container>
+            <Snackbar
+                open={snack.open}
+                autoHideDuration={2400}
+                onClose={() => setSnack({ open: false, msg: "" })}
+                message={snack.msg}
+            />
         </Box>
-
     );
 }
