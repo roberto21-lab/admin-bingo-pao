@@ -5,6 +5,9 @@ import {
   FormLabel, Button
 } from "@mui/material";
 
+// 👇 importa tu servicio
+import { createRoom } from "../Services/rooms.service"; // ajusta el path real
+
 type PrizeModel = "percent" | "fixed";
 type PriceMode = "autoFromPrize" | "manual";
 
@@ -27,7 +30,7 @@ const PATTERN_LABELS: Record<Pattern, string> = {
   full: "Full (cartón lleno)",
 };
 
-type RoundConfig = { pattern: Pattern; percent: number; };
+type RoundConfig = { pattern: Pattern; percent: number };
 
 const DEFAULT_ROUNDS: RoundConfig[] = [
   { pattern: "horizontal", percent: 40 },
@@ -36,47 +39,62 @@ const DEFAULT_ROUNDS: RoundConfig[] = [
 ];
 
 type State = {
+  status: "scheduled" | "open" | "closed";
   name: string;
-  currency: "Bs" | "USD";
+  currency: "Bs" | "USD"; // 👈 solo visual, el back usa currency_id
   ticketPrice: number;
   minTicketsToStart: number;
-  maxTickets?: number | "";
-  maxPerPlayer?: number | "";
-  commission: number; // % para la casa (10 por defecto)
+  // maxTickets?: number | "";
+  // maxPerPlayer?: number | "";
+  commission: number; // % para la casa en el preview (el back ahora usa fijo 10%)
   prizeModel: PrizeModel;
   priceMode: PriceMode;
   scheduledAt?: string;
   isPublic: boolean;
   description?: string;
 
-  rounds: RoundConfig[]; // 3 rondas
+  rounds: RoundConfig[];
   ticketsPreview: number;
 };
 
-// 👉 Tipo sugerido para el payload (ajústalo a tu back si difiere)
 type CreateRoomPayload = {
+  status: "scheduled" | "open" | "closed";
   name: string;
-  currency: "Bs" | "USD";
   price_per_card: number;
   min_players: number;
-  max_tickets?: number | null;
-  max_per_player?: number | null;
-  admin_fee: number;           // en decimal (0.10 = 10%). Si tu back quiere 10, cambia abajo.
-  is_public: boolean;
-  scheduled_at?: string | null;
+  max_rounds: number;
+  currency_id: string;
   description?: string | null;
-  rounds: Array<{ round: number; pattern: Pattern; percent: number }>;
+  // new optional fields supported by the API payload
+  is_public?: boolean;
+  scheduled_at?: string | null;
+
+  // optional fields that the frontend may compute and send
+  total_prize?: number;
+  currency?: "Bs" | "USD";
+
+  rounds: Array<{
+    round: number;
+    pattern: Pattern;
+    percent: number;
+    prize_amount?: number;
+  }>;
 };
+
+const DEFAULT_CURRENCY_ID = "691b47f1b0a2446494b164fc";
 
 export default function CrearSalaFormFlex() {
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
   const [state, setState] = React.useState<State>({
+    status: "scheduled",
     name: "",
     currency: "USD",
     ticketPrice: 1,
     minTicketsToStart: 10,
-    maxTickets: "",
-    maxPerPlayer: "",
+    // maxTickets: "",
+    // maxPerPlayer: "",
     commission: 10,
     prizeModel: "percent",
     priceMode: "manual",
@@ -96,56 +114,137 @@ export default function CrearSalaFormFlex() {
       return { ...s, rounds };
     });
 
-  const percentToWinners = 100 - state.commission;
-  const roundsSum = state.rounds.reduce((acc, r) => acc + (Number(r.percent) || 0), 0);
+  // 👉 ahora el back exige que la suma sea 100%
+  const roundsSum = state.rounds.reduce(
+    (acc, r) => acc + (Number(r.percent) || 0),
+    0
+  );
+  const percentToWinners = 100;
   const roundsValid = roundsSum === percentToWinners;
 
-  const potPreview = (Number(state.ticketsPreview) || 0) * (Number(state.ticketPrice) || 0);
+  const potPreview =
+    (Number(state.ticketsPreview) || 0) * (Number(state.ticketPrice) || 0);
   const houseCut = (potPreview * state.commission) / 100;
   const potForWinners = potPreview - houseCut;
 
   const currencySymbol = state.currency === "USD" ? "$" : "Bs";
   const PERCENT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5);
 
-  // 🔧 Construye el payload desde el state (sin validaciones)
+  // const buildPayload = (): CreateRoomPayload => {
+  //   return {
+  //     status: "scheduled",
+  //     name: state.name.trim(),
+  //     price_per_card: Number(state.ticketPrice) || 0,
+  //     min_players: Number(state.minTicketsToStart) || 0,
+  //     max_rounds: state.rounds.length,
+  //     currency_id: DEFAULT_CURRENCY_ID,
+  //     description: state.description?.trim() || null,
+  //     rounds: state.rounds.map((r, i) => ({
+  //       round: i + 1,
+  //       pattern: r.pattern,
+  //       percent: Number(r.percent) || 0,
+  //     })),
+  //   };
+  // };
+
   const buildPayload = (): CreateRoomPayload => {
-    return {
-      name: state.name.trim(),
-      currency: state.currency,
-      price_per_card: Number(state.ticketPrice) || 0,
-      min_players: Number(state.minTicketsToStart) || 0,
-      max_tickets: state.maxTickets === "" ? null : Number(state.maxTickets),
-      max_per_player: state.maxPerPlayer === "" ? null : Number(state.maxPerPlayer),
+  const minPlayers = Number(state.minTicketsToStart) || 0;
+  const pricePerCard = Number(state.ticketPrice) || 0;
+  const commissionPercent = Number(state.commission) || 0;
 
-      // Si tu backend espera 10 (porcentaje), usa: admin_fee: Number(state.commission)
-      admin_fee: Number(state.commission) / 100,
+  // bote base usando el mínimo de cartones
+  const basePot = minPlayers * pricePerCard;
 
-      is_public: !!state.isPublic,
-      scheduled_at: state.scheduledAt ? state.scheduledAt : null,
-      description: state.description?.trim() || null,
+  // bote para premios (después de comisión de la sala)
+  const prizePool = basePot * (1 - commissionPercent / 100);
 
-      rounds: state.rounds.map((r, i) => ({
+  return {
+    status: "scheduled", // 👉 status de la sala
+    name: state.name.trim(),
+    price_per_card: pricePerCard,
+    min_players: minPlayers,
+    max_rounds: state.rounds.length,
+    currency_id: DEFAULT_CURRENCY_ID,
+    description: state.description?.trim() || null,
+    is_public: state.isPublic,           // 👈 nuevo
+    scheduled_at: state.scheduledAt,  // 👈 nuevo
+
+    // 💰 total de premio a repartir en la moneda seleccionada
+    total_prize: Number(prizePool.toFixed(2)),
+    currency: state.currency, // "Bs" | "USD"
+
+    rounds: state.rounds.map((r, i) => {
+      const percent = Number(r.percent) || 0;
+      const prizeAmount = prizePool * (percent / 100);
+
+      return {
         round: i + 1,
         pattern: r.pattern,
-        percent: Number(r.percent) || 0,
-      })),
-    };
+        percent,
+        // 💰 monto que representa el % de esta ronda
+        prize_amount: Number(prizeAmount.toFixed(2)),
+      };
+    }),
   };
+};
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ❌ Si no quieres validar nada, comenta/borra este bloque:
-    // if (!roundsValid) {
-    //   setError(`La suma de % de rondas debe ser ${percentToWinners}% (actual: ${roundsSum}%).`);
-    //   return;
-    // }
+    if (!roundsValid) {
+      setError(
+        `La suma de % de rondas debe ser 100% (actual: ${roundsSum}%).`
+      );
+      return;
+    }
+
+    if (!state.name.trim()) {
+      setError("El nombre de la sala es obligatorio.");
+      return;
+    }
+
+    if (!state.ticketPrice || state.ticketPrice <= 0) {
+      setError("El precio del cartón debe ser mayor a 0.");
+      return;
+    }
+
+    if (!state.minTicketsToStart || state.minTicketsToStart <= 0) {
+      setError("El mínimo de cartones para iniciar debe ser mayor a 0.");
+      return;
+    }
+
     setError(null);
+    setLoading(true);
 
     const payload = buildPayload();
     console.log("🚀 Payload a enviar (crear sala):", payload);
-    // Aquí luego harías: await api.post('/rooms', payload)
+
+    try {
+      // const res = await createRoom(payload);
+      // console.log("✅ Sala creada:", res);
+      // aquí puedes: resetear formulario, navegar, mostrar snackbar, etc.
+    } catch (err: any) {
+      console.error("Error creando sala:", err);
+      const msg =
+        err?.response?.data?.message ||
+        "Error al crear la sala. Intente nuevamente.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
+
+
+  const minTickets = Number(state.minTicketsToStart) || 0;
+  const ticketPrice = Number(state.ticketPrice) || 0;
+
+  const basePot = minTickets * ticketPrice;
+
+  const commissionPercent = Number(state.commission) || 0;
+
+  const prizePool = basePot * (1 - commissionPercent / 100);
+
+  const totalPrizeToDistribute = prizePool;
 
   return (
     <Box component="form" onSubmit={submit} noValidate sx={{ maxWidth: 1000 }}>
@@ -153,9 +252,12 @@ export default function CrearSalaFormFlex() {
         Crear sala
       </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
-      {/* Fila 1 */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
         <TextField
           label="Nombre de la sala"
@@ -168,7 +270,9 @@ export default function CrearSalaFormFlex() {
           <Select
             label="Moneda"
             value={state.currency}
-            onChange={(e) => handleChange("currency", e.target.value as State["currency"])}
+            onChange={(e) =>
+              handleChange("currency", e.target.value as State["currency"])
+            }
           >
             <MenuItem value="Bs">Bs</MenuItem>
             <MenuItem value="USD">USD</MenuItem>
@@ -180,26 +284,54 @@ export default function CrearSalaFormFlex() {
           value={state.ticketPrice}
           onChange={(e) => handleChange("ticketPrice", Number(e.target.value))}
           InputProps={{
-            startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>,
+            startAdornment: (
+              <InputAdornment position="start">{currencySymbol}</InputAdornment>
+            ),
             inputProps: { min: 0, step: "any" },
           }}
           sx={{ minWidth: { sm: 220 } }}
         />
       </Stack>
 
-      {/* Fila 2 */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        sx={{ mb: 2 }}
+      >
+        <TextField
+          label="Premio total a repartir"
+          value={
+            Number.isFinite(totalPrizeToDistribute)
+              ? totalPrizeToDistribute.toFixed(2)
+              : ""
+          }
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                {currencySymbol}
+              </InputAdornment>
+            ),
+            readOnly: true,
+          }}
+          fullWidth
+          disabled
+        />
+      </Stack>
+
+
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
         <TextField
           label="Mín. cartones para iniciar"
           type="number"
           value={state.minTicketsToStart}
-          onChange={(e) => handleChange("minTicketsToStart", Number(e.target.value))}
+          onChange={(e) =>
+            handleChange("minTicketsToStart", Number(e.target.value))
+          }
           InputProps={{ inputProps: { min: 1, step: 1 } }}
         />
         {/* Si luego agregas Máx cartones y Límite por jugador, ponlos aquí */}
       </Stack>
 
-      {/* Fila 3 */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
         <TextField
           label="Comisión sala (%)"
@@ -207,60 +339,78 @@ export default function CrearSalaFormFlex() {
           value={state.commission}
           onChange={(e) => handleChange("commission", Number(e.target.value))}
           InputProps={{ inputProps: { min: 0, max: 100, step: 1 } }}
-          helperText="Por defecto 10% (casa)"
+          helperText="Por defecto 10% (casa, solo para preview)"
           sx={{ maxWidth: { sm: 240 } }}
         />
       </Stack>
 
       <FormLabel sx={{ mb: 1.5, display: "block", fontWeight: 700 }}>
-        Premios (3 ganadores) — repartir {percentToWinners}% del bote
+        Premios (3 ganadores) — repartir 100% del bote destinado a premios
       </FormLabel>
 
       {/* Rondas */}
       <Stack spacing={1.5} sx={{ mb: 1 }}>
-        {state.rounds.map((r, idx) => (
-          <Stack
-            key={idx}
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            alignItems={{ sm: "center" }}
-          >
-            <FormControl sx={{ minWidth: { sm: 260 }, flex: 1 }}>
-              <InputLabel>{`Ronda ${idx + 1} — Patrón`}</InputLabel>
-              <Select
-                label={`Ronda ${idx + 1} — Patrón`}
-                value={r.pattern}
-                onChange={(e) =>
-                  handleRoundChange(idx, { pattern: e.target.value as Pattern })
-                }
-              >
-                {Object.entries(PATTERN_LABELS).map(([val, label]) => (
-                  <MenuItem key={val} value={val}>
-                    {label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        {state.rounds.map((r, idx) => {
+          const roundPercent = Number(r.percent) || 0;
+          const roundPrize = prizePool * (roundPercent / 100);
 
-            <FormControl sx={{ width: { sm: 180 } }}>
-              <InputLabel>{`Ronda ${idx + 1} — %`}</InputLabel>
-              <Select
-                label={`Ronda ${idx + 1} — %`}
-                value={r.percent}
-                onChange={(e) =>
-                  handleRoundChange(idx, { percent: Number(e.target.value) })
-                }
-                renderValue={(v) => `${v}%`}
-              >
-                {PERCENT_OPTIONS.map((p) => (
-                  <MenuItem key={p} value={p}>
-                    {p}%
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-        ))}
+          return (
+            <Stack
+              key={idx}
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ sm: "center" }}
+            >
+              <FormControl sx={{ minWidth: { sm: 260 }, flex: 1 }}>
+                <InputLabel>{`Ronda ${idx + 1} — Patrón`}</InputLabel>
+                <Select
+                  label={`Ronda ${idx + 1} — Patrón`}
+                  value={r.pattern}
+                  onChange={(e) =>
+                    handleRoundChange(idx, {
+                      pattern: e.target.value as Pattern,
+                    })
+                  }
+                >
+                  {Object.entries(PATTERN_LABELS).map(([val, label]) => (
+                    <MenuItem key={val} value={val}>
+                      {label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl sx={{ width: { sm: 160 } }}>
+                <InputLabel>{`Ronda ${idx + 1} — %`}</InputLabel>
+                <Select
+                  label={`Ronda ${idx + 1} — %`}
+                  value={r.percent}
+                  onChange={(e) =>
+                    handleRoundChange(idx, { percent: Number(e.target.value) })
+                  }
+                  renderValue={(v) => `${v}%`}
+                >
+                  {PERCENT_OPTIONS.map((p) => (
+                    <MenuItem key={p} value={p}>
+                      {p}%
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Box sx={{ minWidth: { sm: 200 } }}>
+                <Typography variant="caption" color="text.secondary">
+                  Premio estimado (Ronda {idx + 1})
+                </Typography>
+                <Typography fontWeight={600}>
+                  {Number.isFinite(roundPrize)
+                    ? `${currencySymbol}${roundPrize.toFixed(2)}`
+                    : "—"}
+                </Typography>
+              </Box>
+            </Stack>
+          );
+        })}
       </Stack>
 
       <Typography
@@ -268,10 +418,25 @@ export default function CrearSalaFormFlex() {
         color={roundsValid ? "success.main" : "error"}
         sx={{ display: "block", mb: 2 }}
       >
-        Suma premios: {roundsSum}% — Debe ser {percentToWinners}% (100% - comisión)
+        Suma premios: {roundsSum}% — Debe ser 100%
       </Typography>
 
-      {/* Programación / Pública */}
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        Bote base (mín. cartones: {minTickets}) = {currencySymbol}
+        {basePot.toFixed(2)} — Comisión casa {commissionPercent}% → Bote para premios ={" "}
+        {currencySymbol}
+        {prizePool.toFixed(2)}
+      </Typography>
+
+
+      <Typography
+        variant="caption"
+        color={roundsValid ? "success.main" : "error"}
+        sx={{ display: "block", mb: 2 }}
+      >
+        Suma premios: {roundsSum}% — Debe ser 100%
+      </Typography>
+
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
         <TextField
           label="Programar inicio (opcional)"
@@ -288,12 +453,11 @@ export default function CrearSalaFormFlex() {
               onChange={(e) => handleChange("isPublic", e.target.checked)}
             />
           }
-          label="Sala pública (visible en el hall)"
+          label="Visibilidad pública"
           sx={{ ml: { sm: 1 } }}
         />
       </Stack>
 
-      {/* Descripción */}
       <TextField
         label="Descripción (opcional)"
         multiline
@@ -304,7 +468,6 @@ export default function CrearSalaFormFlex() {
         sx={{ mb: 2 }}
       />
 
-      {/* Preview del bote */}
       <Box
         sx={{
           mt: 1,
@@ -314,20 +477,38 @@ export default function CrearSalaFormFlex() {
           border: (t) => `1px solid ${t.palette.divider}`,
         }}
       >
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems="center"
+        >
           <TextField
             label="Tickets (preview)"
             type="number"
             value={state.ticketsPreview}
-            onChange={(e) => handleChange("ticketsPreview", Number(e.target.value))}
+            onChange={(e) =>
+              handleChange("ticketsPreview", Number(e.target.value))
+            }
             InputProps={{ inputProps: { min: 0, step: 1 } }}
             sx={{ width: { sm: 200 } }}
           />
           <Typography variant="body2" sx={{ flex: 1 }}>
-            Bote = {state.ticketsPreview} × {currencySymbol}{state.ticketPrice} ={" "}
-            <b>{currencySymbol}{(potPreview || 0).toFixed(2)}</b> | Casa ({state.commission}%) ={" "}
-            <b>{currencySymbol}{houseCut.toFixed(2)}</b> | Para premios ={" "}
-            <b>{currencySymbol}{potForWinners.toFixed(2)}</b>
+            Bote = {state.ticketsPreview} × {currencySymbol}
+            {state.ticketPrice} ={" "}
+            <b>
+              {currencySymbol}
+              {(potPreview || 0).toFixed(2)}
+            </b>{" "}
+            | Casa ({state.commission}%) ={" "}
+            <b>
+              {currencySymbol}
+              {houseCut.toFixed(2)}
+            </b>{" "}
+            | Para premios ={" "}
+            <b>
+              {currencySymbol}
+              {potForWinners.toFixed(2)}
+            </b>
           </Typography>
         </Stack>
 
@@ -337,18 +518,16 @@ export default function CrearSalaFormFlex() {
               Ronda {i + 1} ({PATTERN_LABELS[r.pattern]}): {r.percent}% →{" "}
               <b>
                 {currencySymbol}
-                {((potForWinners * r.percent) / percentToWinners || 0).toFixed(2)}
+                {((potForWinners * r.percent) / 100 || 0).toFixed(2)}
               </b>
             </Typography>
           ))}
         </Stack>
       </Box>
 
-      {/* Acciones */}
       <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
-        {/* ❗️Quité el disabled para que siempre puedas hacer el console.log */}
-        <Button type="submit" variant="contained">
-          Crear sala
+        <Button type="submit" variant="contained" disabled={loading}>
+          {loading ? "Creando..." : "Crear sala"}
         </Button>
         <Button
           type="button"
