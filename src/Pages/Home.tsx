@@ -1,7 +1,8 @@
-import { Container, Box, Grid } from "@mui/material";
+import { Box, Container } from "@mui/material";
 // import Hall from "../Componets/Hall";
 import { useNavigate } from "react-router-dom";
 import CreateRoomForm from "../components/CreateRoomForm";
+import { useAuth } from "../context/AuthContext";
 // import Hall from "../components/Hall";
 
 type Room = {
@@ -34,20 +35,22 @@ const MOCK_ROOMS: Room[] = [
 
 export default function Home() {
     const navigate = useNavigate();
+    const auth = useAuth();
+    console.log("🚀 ~ Home ~ auth:", auth)
 
     const handleEnter = (roomId: string) => {
-       navigate(`/room/${roomId}`)
+        navigate(`/room/${roomId}`)
         alert(`Entrando a ${roomId}`);
     };
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Box sx={{ textAlign: "center", mb: 3, fontSize: 24, fontWeight: 700 }}>
-              Crear Nueva sala de BINGO PAO
+                Crear Nueva sala de BINGO PAO
             </Box>
 
             <CreateRoomForm />
-       
+
 
 
         </Container>

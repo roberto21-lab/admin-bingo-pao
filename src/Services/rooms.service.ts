@@ -1,51 +1,40 @@
+// src/Services/rooms.service.ts
 import { api } from "./api";
+
 export type ApiDecimal = { $numberDecimal: string };
 
-
-export type Room = {
-  _id: string;
+// 🔹 Tipo EXACTO de lo que manda el backend (según el JSON que pasaste)
+export type ApiRoom = {
+  id: string;
   name: string;
-  ticketPrice?: number;
-  capacity?: number;
-  sold?: number;
-  startsAt?: string;
-  isPublic?: boolean;
-  status?: "abierta" | "programada" | "cerrada" | string;
-  // agrega aquí cualquier campo real de tu IRoom
+  price_per_card: number;         // viene como number
+  min_players: number;
+  max_rounds: number;
+  currency_id: {
+    _id: string;
+    code: string;
+    name: string;
+    symbol: string;
+  };
+  status_id: {
+    _id: string;
+    name: "waiting_players" | "preparing" | "in_progress" | "finished" | string;
+    category: "room";
+  };
+  status: "waiting_players" | "preparing" | "in_progress" | "finished" | string;
+  is_public: boolean;
+  scheduled_at: string | null;
+  total_prize: number;
+  admin_fee: number;
+  description: string;
+  players: any[];
+  rewards: any[];
+  created_at: string;
+  updated_at: string;
+  __v?: number;
 };
 
-
-// export type ApiRoom = {
-//   _id: string;
-//   name: string;
-//   price_per_card?: ApiDecimal;
-//   min_players?: number;
-//   max_rounds?: number;
-//   status?: "waiting_players" | "preparing" | "in_progress" | "finished" | string;
-//   total_pot?: ApiDecimal;
-//   admin_fee?: ApiDecimal;
-//   players?: any[];
-//   rewards?: any[];
-//   created_at?: string;
-//   updated_at?: string;
-//   capacity?: number;
-//   starts_at?: string;
-//   currency_id?: {
-//     _id: string;
-//     code: string;
-//     name: string;
-//     symbol: string;
-//   };
-// };
-// Respuesta del back según tu controlador
-export type CreateRoomResponse = {
-  success: boolean;
-  message: string;
-  room: ApiRoom;
-};
-
-
-// 👇 DTO para crear sala: EXACTO a lo que espera el controlador
+// 👉 Este es el DTO que usas para crear
 export type CreateRoomDto = {
   name: string;
   price_per_card: number;
@@ -55,40 +44,28 @@ export type CreateRoomDto = {
   description?: string | null;
   rounds: Array<{
     round: number;
-    pattern: string; // o Pattern si lo importas del front
+    pattern: string;
     percent: number;
   }>;
 };
 
-
-export type ApiRoom = {
-  _id: string;
-  name: string;
-  price_per_card?: ApiDecimal;
-  min_players?: number;
-  max_rounds?: number;
-  status?: "waiting_players" | "preparing" | "in_progress" | "finished" | string;
-  total_pot?: ApiDecimal;
-  admin_fee?: ApiDecimal;
-  players?: any[];
-  rewards?: any[];
-  created_at?: string;
-  updated_at?: string;
-  capacity?: number;
-  starts_at?: string;
+export type CreateRoomResponse = {
+  success: boolean;
+  message: string;
+  room: ApiRoom;
 };
 
-export async function getRooms(): Promise<Room[]> {
-  // si tu ruta real es /api/rooms, cámbiala aquí:
-  const { data } = await api.get<{ success: boolean; data: Room[] }>("/rooms");
-  return data.data;
+// ✅ AHORA getRooms devuelve directamente ApiRoom[]
+export async function getRooms(): Promise<ApiRoom[]> {
+  // si tu endpoint es /api/rooms cámbialo aquí
+  const { data } = await api.get<ApiRoom[]>("/rooms");
+  return data; // <– aquí estaba el problema, antes hacías data.data
 }
 
 export async function getRoomById(id: string): Promise<ApiRoom> {
-  const { data } = await api.get<{ success: boolean; data: ApiRoom }>(`/rooms/${id}`);
-  return data.data; // ← desenrolla `data`
+  const { data } = await api.get<ApiRoom>(`/rooms/${id}`);
+  return data;
 }
-
 
 export async function createRoom(payload: CreateRoomDto): Promise<CreateRoomResponse> {
   const { data } = await api.post<CreateRoomResponse>("/rooms", payload);

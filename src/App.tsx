@@ -1,22 +1,28 @@
 // src/App.tsx
-import { Route, Routes, useLocation } from "react-router-dom";
-import Footer from "./components/Footer";
-import Home from "./Pages/Home";
-import Register from "./Pages/Register";
-import Rooms from "./Pages/Rooms";
-import UserPurchaseDetail from "./Pages/UserPurchaseDetail";
 import { ThemeProvider } from "@emotion/react";
-import theme from "./theme";
 import { Box, CssBaseline, Toolbar } from "@mui/material";
-import React from "react";
-import Login from "./Pages/Login";
+import {
+  Route,
+  Routes,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+
 import Menu from "./components/Menu";
+import Home from "./Pages/Home";
 import LoadRequest from "./Pages/loadRequest";
-import WithdrawalRequest from "./Pages/WithdrawalRequest";
-import UserWithdraw from "./Pages/UserWithdraw";
+import Login from "./Pages/Login";
+import Register from "./Pages/Register";
 import RoomDetails from "./Pages/RoomDetails";
-import Users from "./Pages/Users";
+import Rooms from "./Pages/Rooms";
 import UserDetails from "./Pages/UserDetails";
+import UserPurchaseDetail from "./Pages/UserPurchaseDetail";
+import Users from "./Pages/Users";
+import UserWithdraw from "./Pages/UserWithdraw";
+import WithdrawalRequest from "./Pages/WithdrawalRequest";
+import theme from "./theme";
+import { useAuth } from "./context/AuthContext";
+import type { JSX } from "react";
 
 function NotFound() {
   return (
@@ -27,13 +33,42 @@ function NotFound() {
   );
 }
 
+// 🔒 Ruta privada: solo accesible si hay usuario logueado
+function PrivateRoute({ children }: { children: JSX.Element }) {
+  const { isAuthenticated, initialized } = useAuth();
+
+  // Mientras carga el contexto (lee localStorage), no hacemos nada.
+  // Aquí puedes poner un spinner si quieres.
+  if (!initialized) return null;
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+// 🔓 Ruta pública (login): si ya está logueado, lo llevo al home
+function PublicRoute({ children }: { children: JSX.Element }) {
+  const { isAuthenticated, initialized } = useAuth();
+
+  if (!initialized) return null;
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   const location = useLocation();
 
-  // Mostrar/ocultar menú y footer según la ruta
+  // Mostrar/ocultar menú según la ruta
   const isLogin = location.pathname === "/login";
   const showMenu = !isLogin;
-  const showFooter = !isLogin;
+  // si luego usas footer, lo puedes manejar con showFooter igual
+  // const showFooter = !isLogin;
 
   // Debe coincidir con el ancho del Drawer en tu componente Menu
   const drawerWidth = 260;
@@ -46,44 +81,112 @@ export default function App() {
         {/* Menú lateral (md+) */}
         {showMenu && <Menu />}
 
-        {/* Contenido principal */}
-     
-          {/* Si más adelante agregas un AppBar, este Toolbar empuja el contenido */}
-          <Toolbar />
+        <Toolbar />
 
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            // si tu Menu desplaza el contenido: ml: { md: `${drawerWidth}px` },
+          }}
+        >
           <Routes>
-            {/* Rutas con layout (verán Menu y Footer) */}
-            <Route path="/" element={<Home />} />
-            <Route path="/rooms" element={<Rooms />} />
-            <Route path="/purchase/:id" element={<UserPurchaseDetail />} />
-            <Route path="/user-withdraw/:id" element={<UserWithdraw />} />
-            <Route path="/room-details/:id" element={<RoomDetails />} />
-            <Route path="/user-details/:id" element={<UserDetails />} />
+            {/* 🔐 RUTAS PRIVADAS */}
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <Home />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/rooms"
+              element={
+                <PrivateRoute>
+                  <Rooms />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/purchase/:id"
+              element={
+                <PrivateRoute>
+                  <UserPurchaseDetail />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/user-withdraw/:id"
+              element={
+                <PrivateRoute>
+                  <UserWithdraw />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/room-details/:id"
+              element={
+                <PrivateRoute>
+                  <RoomDetails />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/user-details/:id"
+              element={
+                <PrivateRoute>
+                  <UserDetails />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/register-user"
+              element={
+                <PrivateRoute>
+                  <Register />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <PrivateRoute>
+                  <Users />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/topup-requests"
+              element={
+                <PrivateRoute>
+                  <LoadRequest />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/withdraw-requests"
+              element={
+                <PrivateRoute>
+                  <WithdrawalRequest />
+                </PrivateRoute>
+              }
+            />
 
-            
-            
-            
-            <Route path="/register-user" element={<Register />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="/topup-requests" element={<LoadRequest />} />
-            <Route path="/withdraw-requests" element={<WithdrawalRequest />} />
-            {/* WithdrawalRequest */}
-            {/* Login sin layout */}
-            <Route path="/login" element={<Login />} />
+            {/* 🔓 LOGIN – solo si NO está autenticado */}
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-
-        {/* Footer fijo */}
-        {/* {showFooter && (
-          <Footer
-            createTo="/"
-            otherTo="/rooms"
-            createLabel="Crear sala"
-            otherLabel="Salas"
-          />
-        )} */}
+        </Box>
       </Box>
     </ThemeProvider>
   );

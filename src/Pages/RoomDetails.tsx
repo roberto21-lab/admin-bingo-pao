@@ -114,25 +114,37 @@ export default function RoomDetails() {
     })();
   }, [id]);
 
-  // valores numéricos
-  const price = toNumFlexible((room as any)?.price_per_card);
-  const totalPot = toNumFlexible((room as any)?.total_pot);
-  const adminFeeAmount = toNumFlexible((room as any)?.admin_fee);
-  const totalPrize = toNumFlexible((room as any)?.total_prize); // 💰 tu campo nuevo
+// valores numéricos
+const price = toNumFlexible((room as any)?.price_per_card);
+const totalPot = toNumFlexible((room as any)?.total_pot);
+const adminFeeAmount = toNumFlexible((room as any)?.admin_fee);
+// const totalPrize = toNumFlexible((room as any)?.total_prize); // 💰 tu campo nuevo
 
-  const playersCount = room?.players?.length ?? 0;
-  const rewardsCount = room?.rewards?.length ?? 0;
+// rounds con prize_amount
+const rounds = ((room as any)?.rounds ?? []) as Array<{
+  round_number: React.Key | null | undefined;
+  reward: any;
+  round: number;
+  pattern: string;
+  percent: number;
+  prize_amount?: number | ApiDecimal;
+}>;
 
-  // moneda
-  const { code: currencyCode, label: currencyLabel } = resolveCurrency(room);
+const totalPrizeFromBackend = toNumFlexible((room as any)?.total_prize);
 
-  // rounds con prize_amount
-  const rounds = ((room as any)?.rounds ?? []) as Array<{
-    round: number;
-    pattern: string;
-    percent: number;
-    prize_amount?: number | ApiDecimal;
-  }>;
+const totalPrize =
+  typeof totalPrizeFromBackend === "number"
+    ? totalPrizeFromBackend
+    : rounds.reduce((acc, r) => {
+        const amount = toNumFlexible(r.prize_amount as any);
+        return acc + (typeof amount === "number" ? amount : 0);
+      }, 0);
+
+const playersCount = room?.players?.length ?? 0;
+const rewardsCount = room?.rewards?.length ?? 0;
+
+// moneda
+const { code: currencyCode, label: currencyLabel } = resolveCurrency(room);
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -171,14 +183,7 @@ export default function RoomDetails() {
                 <Typography variant="h5" fontWeight={800}>
                   {room.name}
                 </Typography>
-                {/* <Typography variant="caption" color="text.secondary">
-                  ID: {(room as any)._id}
-                </Typography> */}
-                {/* {room.description && (
-                  <Typography variant="body2" color="text.secondary">
-                    {room.description}
-                  </Typography>
-                )} */}
+             
                 <Typography variant="caption" color="text.secondary">
                   Visibilidad:{" "}
                   <strong>
@@ -300,44 +305,43 @@ export default function RoomDetails() {
               </Box>
             </Stack>
 
-            {/* Rondas / Premios */}
-            {rounds.length > 0 && (
-              <>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={800}
-                  sx={{ mb: 1 }}
-                >
-                  Rondas & Premios
-                </Typography>
+{rounds.length > 0 && (
+  <>
+    <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+      Rondas & Premios
+    </Typography>
 
-                <Stack spacing={1.5} sx={{ mb: 2 }}>
-                  {rounds.map((r) => {
-                    const prizeAmount = toNumFlexible(r.prize_amount);
-                    return (
-                      <Box
-                        key={r.round}
-                        sx={{
-                          borderRadius: 1,
-                          border: (t) => `1px solid ${t.palette.divider}`,
-                          p: 1.5,
-                        }}
-                      >
-                        <Typography fontWeight={700}>
-                          Ronda {r.round} — {r.pattern} ({r.percent}%)
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Premio estimado:{" "}
-                          {typeof prizeAmount === "number"
-                            ? formatMoney(prizeAmount, currencyCode)
-                            : "—"}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              </>
-            )}
+    <Stack spacing={1.5} sx={{ mb: 2 }}>
+      {rounds.map((r) => {
+        const prizeAmount = toNumFlexible(r.reward?.amount as any);
+
+        return (
+          <Box
+            key={r.round_number}
+            sx={{
+              borderRadius: 1,
+              border: (t) => `1px solid ${t.palette.divider}`,
+              p: 1.5,
+            }}
+          >
+            <Typography fontWeight={700}>
+              Ronda {r.round_number} — {r.reward?.pattern} ({r.reward?.percent}
+              %)
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Premio:{" "}
+              {typeof prizeAmount === "number"
+                ? formatMoney(prizeAmount, currencyCode)
+                : "—"}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Stack>
+  </>
+)}
+
+
 
             {/* Jugadores / Recompensas */}
             <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>

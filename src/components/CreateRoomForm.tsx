@@ -12,12 +12,12 @@ type PrizeModel = "percent" | "fixed";
 type PriceMode = "autoFromPrize" | "manual";
 
 type Pattern =
+  | "random"
   | "horizontal"
   | "vertical"
   | "diagonal"
   | "cross_small"
   | "cross_big"
-  | "random"
   | "full";
 
 const PATTERN_LABELS: Record<Pattern, string> = {
@@ -33,13 +33,13 @@ const PATTERN_LABELS: Record<Pattern, string> = {
 type RoundConfig = { pattern: Pattern; percent: number };
 
 const DEFAULT_ROUNDS: RoundConfig[] = [
-  { pattern: "horizontal", percent: 40 },
+  { pattern: "horizontal", percent: 30 },
   { pattern: "vertical", percent: 30 },
-  { pattern: "full", percent: 20 },
+  { pattern: "full", percent: 40 },
 ];
 
 type State = {
-  status: "scheduled" | "open" | "closed";
+  status: "in_progress";
   name: string;
   currency: "Bs" | "USD"; // 👈 solo visual, el back usa currency_id
   ticketPrice: number;
@@ -58,7 +58,7 @@ type State = {
 };
 
 type CreateRoomPayload = {
-  status: "scheduled" | "open" | "closed";
+  status: "in_progress";
   name: string;
   price_per_card: number;
   min_players: number;
@@ -88,7 +88,7 @@ export default function CrearSalaFormFlex() {
   const [loading, setLoading] = React.useState(false);
 
   const [state, setState] = React.useState<State>({
-    status: "scheduled",
+    status: "in_progress",
     name: "",
     currency: "USD",
     ticketPrice: 1,
@@ -159,12 +159,12 @@ export default function CrearSalaFormFlex() {
   const prizePool = basePot * (1 - commissionPercent / 100);
 
   return {
-    status: "scheduled", // 👉 status de la sala
+    status: "in_progress", // 👉 status de la sala
     name: state.name.trim(),
     price_per_card: pricePerCard,
     min_players: minPlayers,
     max_rounds: state.rounds.length,
-    currency_id: DEFAULT_CURRENCY_ID,
+    currency_id: "691cbf660d374a9d0bb4cdc9",
     description: state.description?.trim() || null,
     is_public: state.isPublic,           // 👈 nuevo
     scheduled_at: state.scheduledAt,  // 👈 nuevo
@@ -220,8 +220,8 @@ export default function CrearSalaFormFlex() {
     console.log("🚀 Payload a enviar (crear sala):", payload);
 
     try {
-      // const res = await createRoom(payload);
-      // console.log("✅ Sala creada:", res);
+      const res = await createRoom(payload);
+      console.log("✅ Sala creada:", res);
       // aquí puedes: resetear formulario, navegar, mostrar snackbar, etc.
     } catch (err: any) {
       console.error("Error creando sala:", err);

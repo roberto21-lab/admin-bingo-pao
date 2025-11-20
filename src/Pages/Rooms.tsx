@@ -20,7 +20,6 @@ import {
   IconButton,
 } from "@mui/material";
 
-// 👇 Importamos el servicio y los tipos
 import { getRooms, type ApiDecimal, type ApiRoom } from "../Services/rooms.service";
 
 type RoomRow = {
@@ -38,7 +37,6 @@ type RoomRow = {
 export default function Rooms() {
   const navigate = useNavigate();
   const [rows, setRows] = React.useState<RoomRow[]>([]);
-  console.log("🚀 ~ Rooms ~ rows:", rows)
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -48,24 +46,28 @@ export default function Rooms() {
       maximumFractionDigits: 2,
     }).format(n);
 
-  const toNum = (d?: ApiDecimal) => {
-    if (!d || typeof d.$numberDecimal !== "string") return undefined;
-    const n = Number(d.$numberDecimal);
+  type MaybeDecimal = ApiDecimal | number | undefined | null;
+
+  const toNum = (value?: MaybeDecimal) => {
+    if (typeof value === "number") return value;
+    if (!value || typeof value.$numberDecimal !== "string") return undefined;
+
+    const n = Number(value.$numberDecimal);
     return Number.isFinite(n) ? n : undefined;
   };
 
-  const mapToUI = (r: any): RoomRow => {
+  // 🔥 MAPPER TOTALMENTE CORREGIDO
+  const mapToUI = (r: ApiRoom): RoomRow => {
     return {
-      id: r._id,
+      id: r.id,
       name: r.name,
-      ticketPrice: toNum(r.price_per_card),
-      currencySymbol: r.currency_id?.symbol ?? "$",
-      capacity: typeof r.capacity === "number" ? r.capacity : undefined,
+      ticketPrice: toNum(r.price_per_card as any),
+      currencySymbol: r.currency_id?.symbol ?? "Bs",
+      capacity: typeof r.min_players === "number" ? r.min_players : undefined,
       sold: Array.isArray(r.players) ? r.players.length : 0,
-      startsAt: r.starts_at || r.created_at,
+      // startsAt: r.scheduled_at || r.created_at,
       backendStatus: r.status,
-      // por ahora quemado; cuando tengas flag real lo conectas
-      isPublic: true,
+      isPublic: r.is_public,
     };
   };
 
@@ -79,7 +81,9 @@ export default function Rooms() {
       in_progress: { label: "En progreso", color: "success" },
       finished: { label: "Finalizada", color: "default" },
     };
+
     const m = s ? map[s] : undefined;
+
     return (
       <Chip
         size="small"
@@ -89,23 +93,20 @@ export default function Rooms() {
     );
   };
 
-  const onView = (r: RoomRow) => navigate(`/room-details/${r.id}`);
+  const onView = (r: RoomRow) => {
+    console.log("🚀 ~ onView ~ r:", r);
+    navigate(`/room-details/${r.id}`)};
 
   React.useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        // 👇 ahora getRooms ya devuelve ApiRoom[]
-        const data: any = await getRooms();
-        const mapped = data?.map(mapToUI);
-        setRows(mapped);
+        const data = await getRooms();
+        console.log("🚀 ~ Rooms ~ data:", data)
+        setRows((data as ApiRoom[]).map(mapToUI));
       } catch (err: any) {
         console.error("Error al obtener salas:", err);
-        setError(
-          err?.response?.data?.message ||
-            err.message ||
-            "Error al obtener salas"
-        );
+        setError(err?.response?.data?.message || err.message || "Error al obtener salas");
       } finally {
         setLoading(false);
       }
@@ -156,7 +157,7 @@ export default function Rooms() {
             </TableHead>
 
             <TableBody>
-              {rows?.length === 0 && !loading ? (
+              {rows.length === 0 && !loading ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -167,86 +168,50 @@ export default function Rooms() {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows?.map((r) => {
-                  const sold = r.sold ?? 0;
-                  const hasCapacity =
-                    typeof r.capacity === "number" && r.capacity > 0;
-                  const remaining = hasCapacity
-                    ? Math.max((r.capacity as number) - sold, 0)
-                    : undefined;
-                  const pct = hasCapacity
-                    ? Math.min(
-                        100,
-                        Math.round(
-                          (sold / (r.capacity as number)) * 100
-                        )
-                      )
-                    : undefined;
+                rows.map((r) => {
+                  console.log("🚀 ~ Rooms ~ r:", r);
+                  const sold = r.sold;
+                  const hasCapacity = typeof r.capacity === "number";
+                  const remaining = hasCapacity ? (r.capacity! - sold) : undefined;
+                  const pct = hasCapacity ? Math.round((sold / r.capacity!) * 100) : undefined;
 
                   return (
                     <TableRow key={r.id} hover>
                       <TableCell>
                         <Stack spacing={0.3}>
                           <Typography fontWeight={700}>{r.name}</Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            {r.isPublic ? "Pública" : "Privada"}
-                            {typeof r.capacity === "number"
-                              ? ` — Capacidad: ${r.capacity}`
-                              : ""}
+                          <Typography variant="caption" color="text.secondary">
+                            {r.isPublic ? "Pública" : "Privada"} — Capacidad: {r.capacity}
                           </Typography>
                         </Stack>
                       </TableCell>
 
                       <TableCell align="right">
                         {typeof r.ticketPrice === "number"
-                          ? `${r.currencySymbol ?? "$"}${formatMoney(
-                              r.ticketPrice
-                            )}`
+                          ? `${r.currencySymbol}${formatMoney(r.ticketPrice)}`
                           : "—"}
                       </TableCell>
 
                       <TableCell>
                         <Stack spacing={0.5}>
-                          <Stack
-                            direction="row"
-                            justifyContent="space-between"
-                          >
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
+                          <Stack direction="row" justifyContent="space-between">
+                            <Typography variant="caption" color="text.secondary">
                               Vendidos: <b>{sold}</b>
                             </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Disponibles:{" "}
-                              <b>{hasCapacity ? remaining : "—"}</b>
+                            <Typography variant="caption" color="text.secondary">
+                              Disponibles: <b>{remaining ?? "—"}</b>
                             </Typography>
                           </Stack>
 
                           {hasCapacity ? (
                             <>
-                              <LinearProgress
-                                variant="determinate"
-                                value={pct!}
-                              />
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
+                              <LinearProgress variant="determinate" value={pct!} />
+                              <Typography variant="caption" color="text.secondary">
                                 {pct}% vendido
                               </Typography>
                             </>
                           ) : (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
+                            <Typography variant="caption" color="text.secondary">
                               (Capacidad no definida)
                             </Typography>
                           )}
@@ -254,19 +219,13 @@ export default function Rooms() {
                       </TableCell>
 
                       <TableCell>
-                        {r.startsAt
-                          ? new Date(r.startsAt).toLocaleString()
-                          : "—"}
+                        {r.startsAt ? new Date(r.startsAt).toLocaleString() : "—"}
                       </TableCell>
 
                       <TableCell>{statusChipFromBackend(r.backendStatus)}</TableCell>
 
                       <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={() => onView(r)}
-                          aria-label="ver"
-                        >
+                        <IconButton size="small" onClick={() => onView(r)} aria-label="ver">
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </TableCell>
