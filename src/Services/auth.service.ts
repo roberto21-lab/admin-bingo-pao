@@ -1,10 +1,7 @@
 // src/Services/auth.service.ts
 import { api } from "./api";
 
-export type LoginPayload = {
-  email: string;
-  password: string;
-};
+
 
 export type LoggedUser = {
   id: string;
@@ -14,6 +11,11 @@ export type LoggedUser = {
   currency_id: string;   // igual aquí
   balance: number;
   frozen_balance: number;
+};
+
+export type LoginPayload = {
+  email: string;
+  password: string;
 };
 
 export type LoginResponse = {

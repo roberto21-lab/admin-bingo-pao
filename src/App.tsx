@@ -34,30 +34,40 @@ function NotFound() {
 }
 
 // 🔒 Ruta privada: solo accesible si hay usuario logueado
+// function PrivateRoute({ children }: { children: JSX.Element }) {
+//   const { isAuthenticated, initialized } = useAuth();
+
+//   // Mientras carga el contexto (lee localStorage), no hacemos nada.
+//   // Aquí puedes poner un spinner si quieres.
+//   if (!initialized) return null;
+
+//   if (!isAuthenticated) {
+//     return <Navigate to="/login" replace />;
+//   }
+
+//   return children;
+// }
+
+// // 🔓 Ruta pública (login): si ya está logueado, lo llevo al home
+// function PublicRoute({ children }: { children: JSX.Element }) {
+//   const { isAuthenticated, initialized } = useAuth();
+
+//   if (!initialized) return null;
+
+//   if (isAuthenticated) {
+//     return <Navigate to="/" replace />;
+//   }
+
+//   return children;
+// }
+
+// 🔒 Ruta privada: por ahora NO protege nada
 function PrivateRoute({ children }: { children: JSX.Element }) {
-  const { isAuthenticated, initialized } = useAuth();
-
-  // Mientras carga el contexto (lee localStorage), no hacemos nada.
-  // Aquí puedes poner un spinner si quieres.
-  if (!initialized) return null;
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
   return children;
 }
 
-// 🔓 Ruta pública (login): si ya está logueado, lo llevo al home
+// 🔓 Ruta pública (login): por ahora NO redirige si estás logueado
 function PublicRoute({ children }: { children: JSX.Element }) {
-  const { isAuthenticated, initialized } = useAuth();
-
-  if (!initialized) return null;
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
   return children;
 }
 
@@ -140,14 +150,7 @@ export default function App() {
                 </PrivateRoute>
               }
             />
-            <Route
-              path="/register-user"
-              element={
-                <PrivateRoute>
-                  <Register />
-                </PrivateRoute>
-              }
-            />
+           
             <Route
               path="/users"
               element={
@@ -169,6 +172,15 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <WithdrawalRequest />
+                </PrivateRoute>
+              }
+            />
+
+             <Route
+              path="/register-user"
+              element={
+                <PrivateRoute>
+                  <Register />
                 </PrivateRoute>
               }
             />

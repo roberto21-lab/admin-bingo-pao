@@ -7,6 +7,7 @@ import {
 
 // 👇 importa tu servicio
 import { createRoom } from "../Services/rooms.service"; // ajusta el path real
+import { useNavigate } from "react-router-dom";
 
 type PrizeModel = "percent" | "fixed";
 type PriceMode = "autoFromPrize" | "manual";
@@ -39,7 +40,7 @@ const DEFAULT_ROUNDS: RoundConfig[] = [
 ];
 
 type State = {
-  status: "in_progress";
+  status: "waiting_players" | "in_progress" | "completed";
   name: string;
   currency: "Bs" | "USD"; // 👈 solo visual, el back usa currency_id
   ticketPrice: number;
@@ -58,7 +59,7 @@ type State = {
 };
 
 type CreateRoomPayload = {
-  status: "in_progress";
+  status: "waiting_players" | "in_progress" | "completed";
   name: string;
   price_per_card: number;
   min_players: number;
@@ -90,7 +91,7 @@ export default function CrearSalaFormFlex() {
   const [state, setState] = React.useState<State>({
     status: "in_progress",
     name: "",
-    currency: "USD",
+    currency: "Bs",
     ticketPrice: 1,
     minTicketsToStart: 10,
     // maxTickets: "",
@@ -148,45 +149,78 @@ export default function CrearSalaFormFlex() {
   // };
 
   const buildPayload = (): CreateRoomPayload => {
-  const minPlayers = Number(state.minTicketsToStart) || 0;
-  const pricePerCard = Number(state.ticketPrice) || 0;
-  const commissionPercent = Number(state.commission) || 0;
+    const minPlayers = Number(state.minTicketsToStart) || 0;
+    const pricePerCard = Number(state.ticketPrice) || 0;
+    const commissionPercent = Number(state.commission) || 0;
 
-  // bote base usando el mínimo de cartones
-  const basePot = minPlayers * pricePerCard;
+    // bote base usando el mínimo de cartones
+    const basePot = minPlayers * pricePerCard;
 
-  // bote para premios (después de comisión de la sala)
-  const prizePool = basePot * (1 - commissionPercent / 100);
+    // bote para premios (después de comisión de la sala)
+    const prizePool = basePot * (1 - commissionPercent / 100);
 
-  return {
-    status: "in_progress", // 👉 status de la sala
-    name: state.name.trim(),
-    price_per_card: pricePerCard,
-    min_players: minPlayers,
-    max_rounds: state.rounds.length,
-    currency_id: "691cbf660d374a9d0bb4cdc9",
-    description: state.description?.trim() || null,
-    is_public: state.isPublic,           // 👈 nuevo
-    scheduled_at: state.scheduledAt,  // 👈 nuevo
+    // Convertimos la fecha a ISO o la dejamos en null si no hay
+    const scheduledAtIso =
+      state.scheduledAt && state.scheduledAt.trim() !== ""
+        ? new Date(state.scheduledAt).toISOString()
+        : null; // si el backend no acepta null, aquí podemos omitir el campo
 
-    // 💰 total de premio a repartir en la moneda seleccionada
-    total_prize: Number(prizePool.toFixed(2)),
-    currency: state.currency, // "Bs" | "USD"
+    return {
+      // 👇 igual que el ejemplo del backend
+      status: "waiting_players",
+      name: state.name.trim(),
+      price_per_card: pricePerCard,
+      min_players: minPlayers,
+      max_rounds: state.rounds.length,
+      currency_id: "691cbf660d374a9d0bb4cdc9",
+      description: state.description?.trim() || "Sala sin descripción",
+      is_public: state.isPublic,
 
-    rounds: state.rounds.map((r, i) => {
-      const percent = Number(r.percent) || 0;
-      const prizeAmount = prizePool * (percent / 100);
+      // 🕒 fecha en formato ISO (o null)
+      scheduled_at: scheduledAtIso,
 
-      return {
-        round: i + 1,
-        pattern: r.pattern,
-        percent,
-        // 💰 monto que representa el % de esta ronda
-        prize_amount: Number(prizeAmount.toFixed(2)),
-      };
-    }),
+      // 💰 total de premio a repartir
+      total_prize: Number(prizePool.toFixed(2)),
+
+      // ❌ IMPORTANTE: quitamos `currency`, el backend no lo espera
+      // currency: state.currency,  // ⬅️ ELIMINADO
+
+      rounds: state.rounds.map((r, i) => {
+        const percent = Number(r.percent) || 0;
+        const prizeAmount = prizePool * (percent / 100);
+
+        return {
+          round: i + 1,                // 1, 2, 3...
+          pattern: r.pattern,          // "horizontal" | "vertical" | "diagonal" | etc.
+          percent,                     // número
+          prize_amount: Number(prizeAmount.toFixed(2)), // número
+        };
+      }),
+    };
   };
-};
+
+  const navigate = useNavigate();
+
+  const resetForm = () => {
+    setState({
+      status: "in_progress",
+      name: "",
+      currency: "Bs",
+      ticketPrice: 1,
+      minTicketsToStart: 10,
+      // maxTickets: "",
+      // maxPerPlayer: "",
+      commission: 10,
+      prizeModel: "percent",
+      priceMode: "manual",
+      scheduledAt: "",
+      isPublic: true,
+      description: "",
+      rounds: DEFAULT_ROUNDS,
+      ticketsPreview: 100,
+    });
+    setError(null);
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,6 +256,10 @@ export default function CrearSalaFormFlex() {
     try {
       const res = await createRoom(payload);
       console.log("✅ Sala creada:", res);
+      navigate('/rooms');
+      // aqui debo limpiar el formulario o redirigir
+      resetForm();
+
       // aquí puedes: resetear formulario, navegar, mostrar snackbar, etc.
     } catch (err: any) {
       console.error("Error creando sala:", err);
