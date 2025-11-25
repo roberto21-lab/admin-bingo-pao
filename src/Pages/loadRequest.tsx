@@ -1,7 +1,8 @@
 // src/Pages/loadRequest.tsx
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import {
+  Chip,
   Container,
   IconButton,
   InputAdornment,
@@ -12,86 +13,154 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TablePagination,
   TableRow,
   TextField,
   Typography,
+  ToggleButton,
+  ToggleButtonGroup,
+  TablePagination
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  getRechargeTransactionsService,
+  getTransactionsService,
+  type Transaction,
+} from "../Services/transactionService";
 
-type LoadRequestRow = {
-  id: string;
-  name: string;
-  amount: number; // monto solicitado
-  createdAt: string;
+type SegmentValue = "in_progress" | "completed" | "rejected";
+
+const formatMoney = (n: number) =>
+  new Intl.NumberFormat("es-VE", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+
+// 🔹 Status lógico a partir del status_id real de la transacción
+const getLogicalStatus = (t: any): SegmentValue => {
+  const raw = t?.status_id?.name?.toLowerCase?.();
+
+  // null o "pending" → En progreso
+  if (!raw || raw === "pending") return "in_progress";
+  if (raw === "completed") return "completed";
+  if (raw === "rejected") return "rejected";
+
+  // fallback
+  return "in_progress";
 };
-
-const NAMES = [
-  "María Pérez","Juan Gómez","Ana López","Carlos Ruiz","Luis Torres",
-  "Gabriela Díaz","Pedro Aguilar","Lucía Romero","Andrés Castillo","Sofía Herrera",
-  "Diego Rivas","Valentina Soto","Miguel Navarro","Daniela Fuentes","Jorge Medina",
-  "Camila Vargas","Ricardo Paredes","Paola Márquez","Fernando Silva","Adriana León"
-];
-
-// 👉 20 registros mock
-const MOCK_ROWS: LoadRequestRow[] = Array.from({ length: 20 }, (_, i) => {
-  const base = 20 + i;
-  return {
-    id: String(i + 1),
-    name: NAMES[i],
-    amount: (base % 7) * 10 + 15, // montos variados
-    createdAt: new Date(Date.now() - i * 86400000).toISOString(), // días hacia atrás
-  };
-});
 
 export default function LoadRequest() {
   const navigate = useNavigate();
 
-  // estado base
-  const [rows] = React.useState<LoadRequestRow[]>(MOCK_ROWS);
+  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [query, setQuery] = React.useState("");
-  const [page, setPage] = React.useState(0);
-  const rowsPerPage = 10;
+  const [segment, setSegment] = React.useState<SegmentValue>("in_progress");
+  const [page, setPage] = React.useState(0);          // 👈 NUEVO
+const [rowsPerPage, setRowsPerPage] = React.useState(10); // 👈 NUEVO
+
+  React.useEffect(() => {
+    getRechargeTransactionsService()
+      .then(setTransactions)
+      .catch((err) => {
+        console.error("Error obteniendo transacciones", err);
+      });
+  }, []);
+
+  React.useEffect(() => {
+  setPage(0);
+}, [segment, query]);
+
+const handleChangePage = (_: unknown, newPage: number) => {
+  setPage(newPage);
+};
+
+const handleChangeRowsPerPage = (
+  event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+) => {
+  setRowsPerPage(parseInt(event.target.value, 10));
+  setPage(0);
+};
 
   const handleQuery = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
-    setPage(0);
   };
 
-  const handlePageChange = (_: unknown, newPage: number) => {
-    setPage(newPage);
+  const onView = (t: any) => {
+    navigate(`/purchase/${t._id}`);
   };
 
-  const filtered = React.useMemo(() => {
+  // 🔹 Primero filtramos por búsqueda
+  const filteredBySearch = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.name.toLowerCase().includes(q));
-  }, [rows, query]);
+    if (!q) return transactions;
 
-  const paged = React.useMemo(() => {
-    const start = page * rowsPerPage;
-    return filtered.slice(start, start + rowsPerPage);
-  }, [filtered, page]);
+    return transactions.filter((t: any) => {
+      const bank = t.metadata?.bankName ?? "";
+      const ref =
+        t.metadata?.refCode ?? t.metadata?.reference_code ?? "";
+      const typeName = t.transaction_type_id?.name ?? "";
+      const userName = t.wallet_id?.user_id?.name ?? "";
 
-  const formatMoney = (n: number) =>
-    new Intl.NumberFormat("es-VE", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(n);
+      return [bank, ref, typeName, userName].some((field) =>
+        field.toLowerCase().includes(q)
+      );
+    });
+  }, [transactions, query]);
 
-  const onView = (r: LoadRequestRow) => {
-    navigate(`/purchase/${r.id}`);
-  };
+  // 🔹 Luego separamos por status
+  const inProgress = filteredBySearch.filter(
+    (t) => getLogicalStatus(t) === "in_progress"
+  );
+  const completed = filteredBySearch.filter(
+    (t) => getLogicalStatus(t) === "completed"
+  );
+  const rejected = filteredBySearch.filter(
+    (t) => getLogicalStatus(t) === "rejected"
+  );
+
+  let currentData: any[] = [];
+  let currentTitle = "";
+
+  if (segment === "in_progress") {
+    currentData = inProgress;
+    currentTitle = "En progreso";
+  } else if (segment === "completed") {
+    currentData = completed;
+    currentTitle = "Completadas";
+  } else {
+    currentData = rejected;
+    currentTitle = "Rechazadas";
+  }
+
+
+//   let currentData: any[] = [];
+// let currentTitle = "";
+
+if (segment === "in_progress") {
+  currentData = inProgress;
+  currentTitle = "En progreso";
+} else if (segment === "completed") {
+  currentData = completed;
+  currentTitle = "Completadas";
+} else {
+  currentData = rejected;
+  currentTitle = "Rechazadas";
+}
+
+// 👇 NUEVO: slice para paginar
+const paginatedData =
+  currentData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
+      {/* Header + buscador + segment */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}
-        alignItems="center"
+        alignItems={{ xs: "flex-start", sm: "center" }}
         justifyContent="space-between"
         sx={{ mb: 2 }}
       >
@@ -100,7 +169,7 @@ export default function LoadRequest() {
         </Typography>
 
         <TextField
-          placeholder="Buscar por nombre…"
+          placeholder="Buscar por nombre, banco o referencia…"
           value={query}
           onChange={handleQuery}
           size="small"
@@ -115,52 +184,177 @@ export default function LoadRequest() {
         />
       </Stack>
 
-      <TableContainer component={Paper} variant="outlined">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Nombre</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Monto</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
-              <TableCell sx={{ fontWeight: 700 }} align="right">
-                Acciones
+      <Stack
+        direction="row"
+        justifyContent="flex-end"
+        sx={{ mb: 2 }}
+      >
+        <ToggleButtonGroup
+          value={segment}
+          exclusive
+          onChange={(_, value) => {
+            if (value) setSegment(value);
+          }}
+          size="small"
+        >
+          <ToggleButton value="in_progress">
+            En progreso ({inProgress.length})
+          </ToggleButton>
+          <ToggleButton value="completed">
+            Completadas ({completed.length})
+          </ToggleButton>
+          <ToggleButton value="rejected">
+            Rechazadas ({rejected.length})
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+
+      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+        {currentTitle} — {currentData.length} registros
+      </Typography>
+
+      <TableContainer
+  component={Paper}
+  sx={{
+    mt: 1,
+    borderRadius: 3,
+    overflow: "hidden",
+    border: "1px solid",
+    borderColor: "divider",
+  }}
+>
+  <Table size="small">
+    <TableHead>
+      <TableRow>
+        <TableCell sx={{ fontWeight: 700 }}>Nombre / Banco</TableCell>
+        <TableCell sx={{ fontWeight: 700 }}>Estado</TableCell>
+        <TableCell sx={{ fontWeight: 700 }} align="right">
+          Monto
+        </TableCell>
+        <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
+        <TableCell sx={{ fontWeight: 700 }} align="right">
+          Acciones
+        </TableCell>
+      </TableRow>
+    </TableHead>
+
+    <TableBody>
+      {currentData.length === 0 ? (
+        <TableRow>
+          <TableCell
+            colSpan={5}
+            align="center"
+            sx={{ py: 4, color: "text.secondary" }}
+          >
+            (Sin registros para este estado)
+          </TableCell>
+        </TableRow>
+      ) : (
+        paginatedData.map((t: any) => {          // 👈 AQUÍ USAMOS paginatedData
+          const amount = Number(
+            t.amount?.$numberDecimal ?? t.amount ?? 0
+          );
+          const date = new Date(t.created_at ?? t.updatedAt);
+
+          const name =
+            t.metadata?.bankName ||
+            t.metadata?.reference_code ||
+            t.metadata?.refCode ||
+            t.transaction_type_id?.name ||
+            "Transacción";
+
+          const rawStatus = t.status_id?.name?.toLowerCase?.();
+          let statusLabel = "Sin estado";
+          let statusColor:
+            | "default"
+            | "success"
+            | "warning"
+            | "error" = "default";
+
+          if (!rawStatus) {
+            statusLabel = "Pendiente";
+            statusColor = "warning";
+          } else if (rawStatus === "completed") {
+            statusLabel = "Completado";
+            statusColor = "success";
+          } else if (rawStatus === "rejected") {
+            statusLabel = "Rechazado";
+            statusColor = "error";
+          } else {
+            statusLabel = t.status_id.name;
+          }
+
+          return (
+            <TableRow key={t._id} hover>
+              {/* Nombre / Banco */}
+              <TableCell>
+                <strong>
+                  {t.wallet_id?.user_id?.name ?? "Usuario"}
+                </strong>
+                <div style={{ fontSize: 12, color: "#777" }}>
+                  {name}
+                  {t.metadata?.refCode ||
+                  t.metadata?.reference_code ? (
+                    <>
+                      {" "}
+                      — Ref:{" "}
+                      {t.metadata.refCode ??
+                        t.metadata.reference_code}
+                    </>
+                  ) : null}
+                </div>
+              </TableCell>
+
+              {/* Estado */}
+              <TableCell>
+                <Chip
+                  label={statusLabel}
+                  size="small"
+                  color={statusColor}
+                  variant={
+                    statusColor === "default" ? "outlined" : "filled"
+                  }
+                />
+              </TableCell>
+
+              {/* Monto */}
+              <TableCell align="right">
+                {formatMoney(amount)} {t.currency_id?.symbol ?? ""}
+              </TableCell>
+
+              {/* Fecha */}
+              <TableCell>{date.toLocaleString()}</TableCell>
+
+              {/* Acciones */}
+              <TableCell align="right">
+                <IconButton
+                  size="small"
+                  onClick={() => onView(t)}
+                  aria-label="ver"
+                >
+                  <VisibilityIcon fontSize="small" />
+                </IconButton>
               </TableCell>
             </TableRow>
-          </TableHead>
+          );
+        })
+      )}
+    </TableBody>
+  </Table>
 
-          <TableBody>
-            {paged.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4, color: "text.secondary" }}>
-                  (Sin registros)
-                </TableCell>
-              </TableRow>
-            ) : (
-              paged.map((r) => (
-                <TableRow key={r.id} hover>
-                  <TableCell>{r.name}</TableCell>
-                  <TableCell>{formatMoney(r.amount)}</TableCell>
-                  <TableCell>{new Date(r.createdAt).toLocaleString()}</TableCell>
-                  <TableCell align="right">
-                    <IconButton size="small" onClick={() => onView(r)} aria-label="ver">
-                      <VisibilityIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+  {/* 🔹 Paginador */}
+  <TablePagination
+    component="div"
+    count={currentData.length}          // total de registros del estado actual
+    page={page}
+    onPageChange={handleChangePage}
+    rowsPerPage={rowsPerPage}
+    onRowsPerPageChange={handleChangeRowsPerPage}
+    rowsPerPageOptions={[10, 25, 50]}  // o [10] si quieres fijo en 10
+    labelRowsPerPage="Filas por página"
+  />
+</TableContainer>
 
-        <TablePagination
-          component="div"
-          count={filtered.length}
-          page={page}
-          onPageChange={handlePageChange}
-          rowsPerPage={rowsPerPage}
-          rowsPerPageOptions={[10]} // fijo a 10
-        />
-      </TableContainer>
     </Container>
   );
 }

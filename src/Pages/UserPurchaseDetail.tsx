@@ -16,122 +16,154 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getTransactionByIdService, updateTransactionStatusService } from "../Services/transactionService";
+import { getUserById, type User } from "../Services/users.service";
 
 type PurchaseStatus = "pending" | "paid" | "rejected";
 
-type Purchase = {
-  id: string;
-  userName: string;
-  userEmail?: string;
-  qty: number;
-  ticketPrice?: number;
-  status: PurchaseStatus;
-  createdAt: string;
+// type PurchaseStatus = "pending" | "paid" | "rejected";
 
-  // 💳 Campos de pago móvil
-  bankName: string;
-  amountBs: number;       // monto en bolívares
-  phoneNumber: string;    // número de celular (pago móvil)
-  ciNumber: string;       // cédula
-  referenceNumber: string;// referencia bancaria
-  receiptUrl?: string;    // URL o base64 del comprobante (opcional)
+type WalletUser = {
+  _id: string;
+  name: string;
+  email: string;
 };
 
-const MOCK_PURCHASES: Purchase[] = [
-  {
-    id: "1",
-    userName: "María Pérez",
-    qty: 5,
-    ticketPrice: 10,
-    status: "pending",
-    createdAt: "2025-11-10T18:34:00",
-    bankName: "Banco de Venezuela",
-    amountBs: 850.5,
-    phoneNumber: "0412-5551234",
-    ciNumber: "V-21.345.678",
-    referenceNumber: "1234567",
-    receiptUrl: "", // Deja vacío o coloca un link/base64 de prueba
-  },
-  {
-    id: "2",
-    userName: "Juan Gómez",
-    qty: 2,
-    ticketPrice: 10,
-    status: "paid",
-    createdAt: "2025-11-10T19:01:00",
-    bankName: "Banesco",
-    amountBs: 340.0,
-    phoneNumber: "0414-1112233",
-    ciNumber: "V-18.222.111",
-    referenceNumber: "7654321",
-    receiptUrl: "",
-  },
-  {
-    id: "3",
-    userName: "Ana López",
-    qty: 8,
-    ticketPrice: 10,
-    status: "pending",
-    createdAt: "2025-11-11T09:15:00",
-    bankName: "Mercantil",
-    amountBs: 1200.75,
-    phoneNumber: "0424-7778899",
-    ciNumber: "V-25.987.321",
-    referenceNumber: "9988776",
-    receiptUrl: "",
-  },
-];
+type Wallet = {
+  _id: string;
+  user_id: WalletUser;
+  currency_id: {
+    _id: string;
+    code: string;
+    name: string;
+    symbol: string; // "Bs"
+    is_active: boolean;
+    roles: string[];
+    created_at: string;
+    updated_at: string;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+type Transaction = {
+  _id: string;
+  wallet_id: Wallet;
+  transaction_type_id: {
+    _id: string;
+    name: string; // "recharge"
+    description: string;
+    created_at: string;
+    updated_at: string;
+  };
+  amount: { $numberDecimal: string }; // 100
+  currency_id: Wallet["currency_id"];
+  status_id: {
+    _id: string;
+    name: PurchaseStatus; // "pending" | "paid" | "rejected"
+    category: string;
+    created_at: string;
+    updated_at: string;
+  };
+  metadata: {
+    refCode: string;
+    bankName: string;
+    payerDocType: "V" | "E";
+    payerDocId: string;
+    payerPhone: string;
+    amount: string;        // "4996" (Bs)
+    paidAt: string;        // "2025-11-22T19:16"
+    notes: string;
+    voucherPreview: string | null;
+    voucherFile: any | null;
+  };
+  created_at: string;
+  updatedAt: string;
+};
+
 
 export default function UserPurchaseDetail() {
   const { id } = useParams<{ id: string }>();
+  const [transaction, setTransaction] = React.useState<Transaction | null>(null);
+  const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>("pending");
+  const [confirm, setConfirm] = React.useState<"accept" | "cancel" | null>(null);
+  const [snack, setSnack] = React.useState({ open: false, msg: "" });
   const navigate = useNavigate();
 
-  const record = React.useMemo<Purchase | undefined>(() => {
-    if (!id) return MOCK_PURCHASES[0];
-    return MOCK_PURCHASES.find((p) => p.id === id) ?? MOCK_PURCHASES[0];
+  React.useEffect(() => {
+    if (!id) return;
+
+    const fetchTx = async () => {
+      const data: any = await getTransactionByIdService(id);
+      console.log("🚀 ~ fetchTx ~ data:", data)
+      setTransaction(data);
+      // importante: tomamos el estado desde status_id.name
+      if (data?.status_id?.name) {
+        setLocalStatus(data.status_id.name as PurchaseStatus);
+      }
+    };
+
+    void fetchTx();
   }, [id]);
 
-  const [snack, setSnack] = React.useState<{ open: boolean; msg: string }>({
-    open: false,
-    msg: "",
-  });
-  const [confirm, setConfirm] = React.useState<null | "accept" | "cancel">(null);
+  const openAccept = async () => {
+      setConfirm("accept");                      // solo si todo salió bien
 
-  const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>(
-    record?.status ?? "pending"
-  );
+ 
+  };
 
-  if (!record) return null;
-
-  const total = record.ticketPrice ? record.ticketPrice * record.qty : undefined;
-
-  const statusColor =
-    localStatus === "paid" ? "success" : localStatus === "pending" ? "warning" : "default";
-
-  const openAccept = () => setConfirm("accept");
   const openCancel = () => setConfirm("cancel");
   const closeConfirm = () => setConfirm(null);
 
-  const doAccept = () => {
-    // POST /purchases/:id/accept
-    setLocalStatus("paid");
-    setSnack({ open: true, msg: `Pago de ${record.userName} aceptado.` });
-    setConfirm(null);
+  const formatBs = (amount: number | null | undefined) => {
+    if (amount == null) return "0,00";
+    return amount.toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   };
 
-  const doCancelPayment = () => {
-    // POST /purchases/:id/reject
-    setLocalStatus("rejected");
-    setSnack({ open: true, msg: `Pago de ${record.userName} cancelado.` });
-    setConfirm(null);
+  const doAccept = async () => {
+    if (!transaction) return;
+    // ... tu lógica para aceptar
+       if (!transaction?._id) {
+      console.error("No hay transactionId para actualizar");
+      return;
+    }
+
+    try {
+      const res = await updateTransactionStatusService(
+        transaction._id,                          // 👈 primer parámetro: id de la transacción
+        "6925f9fb1f86e6e6acac19c4"               // 👈 segundo parámetro: status_id
+      );
+
+      console.log("Transacción actualizada:", res.transaction);
+      console.log("Wallet recalculada:", res.wallet);
+
+    } catch (error) {
+      console.error("Error actualizando status:", error);
+      // aquí podrías setear un snackbar de error si quieres
+    }
+    // aqui deberia de mandar a cerrar el modal
+    navigate(-1);
+    closeConfirm();
   };
 
-  const formatBs = (n: number) =>
-    new Intl.NumberFormat("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const doCancelPayment = async () => {
+    if (!transaction) return;
+    closeConfirm();
+
+    // ... tu lógica para cancelar
+  };
 
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
         <Typography variant="h6" fontWeight={800}>
           Detalle del comprador
         </Typography>
@@ -141,56 +173,47 @@ export default function UserPurchaseDetail() {
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-        {/* Cabecera con usuario + chips */}
+        {/* Cabecera con usuario */}
         <Stack direction="row" spacing={2} alignItems="center">
-          <Avatar sx={{ width: 64, height: 64 }}>
-            {record.userName
-              .split(" ")
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase()}
-          </Avatar>
-
           <Stack spacing={0.5}>
+            {/* Nombre del dueño de la wallet */}
             <Typography variant="subtitle1" fontWeight={700}>
-              {record.userName}
+              {transaction?.wallet_id?.user_id?.name}
             </Typography>
-            {record.userEmail && (
-              <Typography variant="body2" color="text.secondary">
-                {record.userEmail}
-              </Typography>
-            )}
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-              <Chip size="small" label={`Estado: ${localStatus}`} color={statusColor as any} />
-              <Chip size="small" variant="outlined" label={`Cartones: ${record.qty}`} />
-              {typeof total === "number" && (
-                <Chip size="small" variant="outlined" label={`Total: $${total.toFixed(2)}`} />
-              )}
-            </Stack>
+
+            {/* Email opcional */}
+            <Typography variant="body2" color="text.secondary">
+              {transaction?.wallet_id?.user_id?.email}
+            </Typography>
           </Stack>
         </Stack>
 
         <Divider sx={{ my: 2 }} />
 
-        {/* Info general */}
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={4} sx={{ mb: 2 }}>
+        {/* Datos generales */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={4}
+          sx={{ mb: 2 }}
+        >
           <Stack spacing={0.5}>
             <Typography variant="caption" color="text.secondary">
               Fecha de solicitud
             </Typography>
-            <Typography>{new Date(record.createdAt).toLocaleString()}</Typography>
+            {/* Puedes mostrar paidAt o created_at según lo que prefieras */}
+            <Typography>{transaction?.metadata?.paidAt}</Typography>
           </Stack>
 
           <Stack spacing={0.5}>
             <Typography variant="caption" color="text.secondary">
-              Precio por cartón
+              Estado
             </Typography>
-            <Typography>{record.ticketPrice ? `$${record.ticketPrice}` : "—"}</Typography>
+            <Typography sx={{ textTransform: "capitalize" }}>
+              {transaction?.status_id?.name}
+            </Typography>
           </Stack>
         </Stack>
 
-        {/* 🧾 Datos del pago móvil */}
         <Typography variant="subtitle2" sx={{ mb: 1.5 }} fontWeight={700}>
           Detalles del pago móvil
         </Typography>
@@ -206,35 +229,49 @@ export default function UserPurchaseDetail() {
               <Typography variant="caption" color="text.secondary">
                 Banco
               </Typography>
-              <Typography fontWeight={600}>{record.bankName}</Typography>
+              <Typography fontWeight={600}>
+                {transaction?.metadata?.bankName}
+              </Typography>
             </Stack>
 
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
-                Monto (Bs)
+                Monto ({transaction?.currency_id?.symbol ?? "Bs"})
               </Typography>
-              <Typography fontWeight={600}>Bs {formatBs(record.amountBs)}</Typography>
+              <Typography fontWeight={600}>
+                {formatBs(
+                  Number(transaction?.metadata?.amount ?? "0")
+                )}
+              </Typography>
             </Stack>
 
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
                 Teléfono (Pago móvil)
               </Typography>
-              <Typography fontWeight={600}>{record.phoneNumber}</Typography>
+              <Typography fontWeight={600}>
+                {transaction?.metadata?.payerPhone}
+              </Typography>
             </Stack>
 
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
                 Cédula
               </Typography>
-              <Typography fontWeight={600}>{record.ciNumber}</Typography>
+              <Typography fontWeight={600}>
+                {transaction?.metadata?.payerDocType}
+                {"-"}
+                {transaction?.metadata?.payerDocId}
+              </Typography>
             </Stack>
 
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
                 N° de referencia
               </Typography>
-              <Typography fontWeight={600}>{record.referenceNumber}</Typography>
+              <Typography fontWeight={600}>
+                {transaction?.metadata?.refCode}
+              </Typography>
             </Stack>
           </Stack>
 
@@ -257,10 +294,10 @@ export default function UserPurchaseDetail() {
                 bgcolor: "background.default",
               }}
             >
-              {record.receiptUrl ? (
+              {transaction?.metadata?.voucherPreview ? (
                 <Box
                   component="img"
-                  src={record.receiptUrl}
+                  src={transaction.metadata.voucherPreview}
                   alt="Comprobante"
                   sx={{
                     maxWidth: "100%",
@@ -279,7 +316,11 @@ export default function UserPurchaseDetail() {
         </Stack>
 
         {/* Botones de acción */}
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 3 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={{ mt: 3 }}
+        >
           <Button
             variant="contained"
             color="primary"
@@ -297,17 +338,6 @@ export default function UserPurchaseDetail() {
           >
             Cancelar pago
           </Button>
-
-          {/* 
-          <Button
-            variant="outlined"
-            color="secondary"
-            onClick={() => {}}
-            disabled
-          >
-            Transferir saldo a este usuario
-          </Button> 
-          */}
         </Stack>
       </Paper>
 
@@ -315,11 +345,18 @@ export default function UserPurchaseDetail() {
       <Dialog open={confirm === "accept"} onClose={closeConfirm}>
         <DialogTitle>Confirmar aceptación</DialogTitle>
         <DialogContent>
-          ¿Confirmas que el pago de <b>{record.userName}</b> es válido?
+          ¿Confirmas que el pago de{" "}
+          <b>{transaction?.wallet_id?.user_id?.name}</b> es válido?
           <br />
-          Banco: <b>{record.bankName}</b> — Monto: <b>Bs {formatBs(record.amountBs)}</b>
+          Banco: <b>{transaction?.metadata?.bankName}</b> — Monto:{" "}
+          <b>
+            {transaction?.currency_id?.symbol ?? "Bs"}{" "}
+            {formatBs(
+              Number(transaction?.metadata?.amount ?? "0")
+            )}
+          </b>
           <br />
-          Ref: <b>{record.referenceNumber}</b>
+          Ref: <b>{transaction?.metadata?.refCode}</b>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeConfirm}>Cancelar</Button>
@@ -333,13 +370,18 @@ export default function UserPurchaseDetail() {
       <Dialog open={confirm === "cancel"} onClose={closeConfirm}>
         <DialogTitle>Confirmar cancelación</DialogTitle>
         <DialogContent>
-          ¿Seguro que deseas <b>cancelar</b> el pago de <b>{record.userName}</b>?
+          ¿Seguro que deseas <b>cancelar</b> el pago de{" "}
+          <b>{transaction?.wallet_id?.user_id?.name}</b>?
           <br />
-          Ref: <b>{record.referenceNumber}</b>
+          Ref: <b>{transaction?.metadata?.refCode}</b>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeConfirm}>No</Button>
-          <Button variant="contained" color="error" onClick={doCancelPayment}>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={doCancelPayment}
+          >
             Sí, cancelar
           </Button>
         </DialogActions>
@@ -354,3 +396,4 @@ export default function UserPurchaseDetail() {
     </Container>
   );
 }
+
