@@ -13,19 +13,18 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
-  Typography,
   ToggleButton,
   ToggleButtonGroup,
-  TablePagination
+  Typography
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getRechargeTransactionsService,
-  getTransactionsService,
-  type Transaction,
+  type Transaction
 } from "../Services/transactionService";
 
 type SegmentValue = "in_progress" | "completed" | "rejected";

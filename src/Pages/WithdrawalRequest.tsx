@@ -13,20 +13,18 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
-  Typography,
   ToggleButton,
   ToggleButtonGroup,
-  TablePagination
+  Typography
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getRechargeTransactionsService,
-  getTransactionsService,
   getWithdrawTransactionsService,
-  type Transaction,
+  type Transaction
 } from "../Services/transactionService";
 
 type SegmentValue = "in_progress" | "completed" | "rejected";
@@ -39,16 +37,13 @@ const formatMoney = (n: number) =>
     maximumFractionDigits: 2,
   }).format(n);
 
-// 🔹 Status lógico a partir del status_id real de la transacción
 const getLogicalStatus = (t: any): SegmentValue => {
   const raw = t?.status_id?.name?.toLowerCase?.();
 
-  // null o "pending" → En progreso
   if (!raw || raw === "pending") return "in_progress";
   if (raw === "completed") return "completed";
   if (raw === "rejected") return "rejected";
 
-  // fallback
   return "in_progress";
 };
 
@@ -58,8 +53,8 @@ export default function WithdrawalRequest() {
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
   const [query, setQuery] = React.useState("");
   const [segment, setSegment] = React.useState<SegmentValue>("in_progress");
-  const [page, setPage] = React.useState(0);          // 👈 NUEVO
-  const [rowsPerPage, setRowsPerPage] = React.useState(10); // 👈 NUEVO
+  const [page, setPage] = React.useState(0);          
+  const [rowsPerPage, setRowsPerPage] = React.useState(10); 
 
   React.useEffect(() => {
     getWithdrawTransactionsService()
@@ -92,7 +87,6 @@ export default function WithdrawalRequest() {
     navigate(`/purchase/${t._id}`);
   };
 
-  // 🔹 Primero filtramos por búsqueda
   const filteredBySearch = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return transactions;
@@ -110,7 +104,6 @@ export default function WithdrawalRequest() {
     });
   }, [transactions, query]);
 
-  // 🔹 Luego separamos por status
   const inProgress = filteredBySearch.filter(
     (t) => getLogicalStatus(t) === "in_progress"
   );
@@ -135,10 +128,6 @@ export default function WithdrawalRequest() {
     currentTitle = "Rechazadas";
   }
 
-
-  //   let currentData: any[] = [];
-  // let currentTitle = "";
-
   if (segment === "in_progress") {
     currentData = inProgress;
     currentTitle = "En progreso";
@@ -150,14 +139,12 @@ export default function WithdrawalRequest() {
     currentTitle = "Rechazadas";
   }
 
-  // 👇 NUEVO: slice para paginar
   const paginatedData =
     currentData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      {/* Header + buscador + segment */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}
@@ -187,14 +174,6 @@ export default function WithdrawalRequest() {
         }}
       />
 
-
-
-      {/* <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1, mt: 2 }}>
-        {currentTitle} — {currentData.length} registros
-      </Typography> */}
-
-    
-
       <Stack sx={{ mb: 1, width: "100%" }}>
         <ToggleButtonGroup
           value={segment}
@@ -210,7 +189,7 @@ export default function WithdrawalRequest() {
         >
           <ToggleButton
             value="in_progress"
-            sx={{ flex: 1 }}   // Ocupa mismo espacio
+            sx={{ flex: 1 }}   
           >
             En progreso ({inProgress.length})
           </ToggleButton>
@@ -269,7 +248,7 @@ export default function WithdrawalRequest() {
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedData.map((t: any) => {          // 👈 AQUÍ USAMOS paginatedData
+              paginatedData.map((t: any) => {      
                 const amount = Number(
                   t.amount?.$numberDecimal ?? t.amount ?? 0
                 );
@@ -324,7 +303,6 @@ export default function WithdrawalRequest() {
                       </div>
                     </TableCell>
 
-                    {/* Estado */}
                     <TableCell>
                       <Chip
                         label={statusLabel}
@@ -336,15 +314,12 @@ export default function WithdrawalRequest() {
                       />
                     </TableCell>
 
-                    {/* Monto */}
                     <TableCell align="right">
                       {formatMoney(amount)} {t.currency_id?.symbol ?? ""}
                     </TableCell>
 
-                    {/* Fecha */}
                     <TableCell>{date.toLocaleString()}</TableCell>
 
-                    {/* Acciones */}
                     <TableCell align="right">
                       <IconButton
                         size="small"
@@ -361,15 +336,14 @@ export default function WithdrawalRequest() {
           </TableBody>
         </Table>
 
-        {/* 🔹 Paginador */}
         <TablePagination
           component="div"
-          count={currentData.length}          // total de registros del estado actual
+          count={currentData.length}          
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[10, 25, 50]}  // o [10] si quieres fijo en 10
+          rowsPerPageOptions={[10, 25, 50]}  
           labelRowsPerPage="Filas por página"
         />
       </TableContainer>

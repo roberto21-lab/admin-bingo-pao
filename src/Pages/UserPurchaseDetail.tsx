@@ -48,16 +48,16 @@ type TransactionDetail = {
   wallet_id: Wallet;
   transaction_type_id: {
     _id: string;
-    name: string; // "recharge"
+    name: string; 
     description: string;
     created_at: string;
     updated_at: string;
   };
-  amount: { $numberDecimal: string }; // 100
+  amount: { $numberDecimal: string }; 
   currency_id: Wallet["currency_id"];
   status_id: {
     _id: string;
-    name: PurchaseStatus; // "pending" | "paid" | "rejected"
+    name: PurchaseStatus; 
     category: string;
     created_at: string;
     updated_at: string;
@@ -68,8 +68,8 @@ type TransactionDetail = {
     payerDocType: "V" | "E";
     payerDocId: string;
     payerPhone: string;
-    amount: string;        // "4996" (Bs)
-    paidAt: string;        // "2025-11-22T19:16"
+    amount: string;      
+    paidAt: string;      
     notes: string;
     voucherPreview: string | null;
     voucherFile: File | Blob | string | null;
@@ -77,7 +77,6 @@ type TransactionDetail = {
   created_at: string;
   updatedAt: string;
 };
-
 
 export default function UserPurchaseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -94,7 +93,6 @@ export default function UserPurchaseDetail() {
       const data = await getTransactionByIdService(id);
       console.log("🚀 ~ fetchTx ~ data:", data);
       setTransaction(data as unknown as TransactionDetail);
-      // importante: tomamos el estado desde status_id.name
       if (data?.status_id?.name) {
         setLocalStatus(data.status_id.name as PurchaseStatus);
       }
@@ -120,7 +118,6 @@ export default function UserPurchaseDetail() {
 
   const doAccept = async () => {
     if (!transaction) return;
-    // ... tu lógica para aceptar
        if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
       return;
@@ -128,12 +125,10 @@ export default function UserPurchaseDetail() {
 
     try {
       const res = await updateTransactionStatusService(
-        transaction._id,                          // 👈 primer parámetro: id de la transacción
-        "6925f9fb1f86e6e6acac19c4"               // 👈 segundo parámetro: status_id
+        transaction._id,                         
+        "6925f9fb1f86e6e6acac19c4"           
       );
 
-      console.log("Transacción actualizada:", res.transaction);
-      console.log("Wallet recalculada:", res.wallet);
 
     } catch (error) {
       console.error("Error actualizando status:", error);
@@ -150,7 +145,6 @@ export default function UserPurchaseDetail() {
   const doCancelPayment = async () => {
     if (!transaction) return;
 
-    // ... tu lógica para aceptar
        if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
       return;
@@ -158,8 +152,8 @@ export default function UserPurchaseDetail() {
 
     try {
       const res = await updateTransactionStatusService(
-        transaction._id,                          // 👈 primer parámetro: id de la transacción
-        "6927127e492039cef10c9802"               // 👈 segundo parámetro: status_id
+        transaction._id,                          
+        "6927127e492039cef10c9802"             
       );
 
       console.log("Transacción actualizada:", res.transaction);
@@ -167,9 +161,7 @@ export default function UserPurchaseDetail() {
 
     } catch (error) {
       console.error("Error actualizando status:", error);
-      // aquí podrías setear un snackbar de error si quieres
     }
-    // aqui deberia de mandar a cerrar el modal
     navigate(-1);
     closeConfirm();
 
@@ -177,12 +169,7 @@ export default function UserPurchaseDetail() {
     closeConfirm();
 
     try {
-      // TODO: Implementar el servicio para rechazar transacciones
-      // const res = await updateTransactionStatusService(
-      //   transaction._id,
-      //   "ID_DEL_STATUS_REJECTED"
-      // );
-      
+   
       setLocalStatus("rejected");
       setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.` });
       closeConfirm();
@@ -210,19 +197,15 @@ export default function UserPurchaseDetail() {
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-        {/* Cabecera con usuario */}
         <Stack direction="row" spacing={2} alignItems="center">
           <Stack spacing={0.5}>
-            {/* Nombre del dueño de la wallet */}
             <Typography variant="subtitle1" fontWeight={700}>
               {transaction?.wallet_id?.user_id?.name}
             </Typography>
 
-            {/* Email opcional */}
             <Typography variant="body2" color="text.secondary">
               {transaction?.wallet_id?.user_id?.email}
             </Typography>
-            {/* Estado */}
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
               <Chip size="small" label={`Estado: ${localStatus}`} color={statusColor} />
             </Stack>
@@ -231,7 +214,6 @@ export default function UserPurchaseDetail() {
 
         <Divider sx={{ my: 2 }} />
 
-        {/* Datos generales */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={4}
@@ -241,7 +223,6 @@ export default function UserPurchaseDetail() {
             <Typography variant="caption" color="text.secondary">
               Fecha de solicitud
             </Typography>
-            {/* Puedes mostrar paidAt o created_at según lo que prefieras */}
             <Typography>{transaction?.metadata?.paidAt}</Typography>
           </Stack>
 
@@ -264,7 +245,6 @@ export default function UserPurchaseDetail() {
           spacing={2.5}
           alignItems={{ md: "flex-start" }}
         >
-          {/* Columna izquierda: datos */}
           <Stack spacing={1.25} sx={{ flex: 1, minWidth: 260 }}>
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
@@ -316,7 +296,6 @@ export default function UserPurchaseDetail() {
             </Stack>
           </Stack>
 
-          {/* Columna derecha: imagen comprobante */}
           <Box sx={{ flex: 1, width: "100%" }}>
             <Typography variant="caption" color="text.secondary">
               Comprobante
@@ -356,7 +335,6 @@ export default function UserPurchaseDetail() {
           </Box>
         </Stack>
 
-        {/* Botones de acción */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -382,7 +360,6 @@ export default function UserPurchaseDetail() {
         </Stack>
       </Paper>
 
-      {/* Diálogo: Aceptar */}
       <Dialog open={confirm === "accept"} onClose={closeConfirm}>
         <DialogTitle>Confirmar aceptación</DialogTitle>
         <DialogContent>
@@ -407,7 +384,6 @@ export default function UserPurchaseDetail() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo: Cancelar */}
       <Dialog open={confirm === "cancel"} onClose={closeConfirm}>
         <DialogTitle>Confirmar cancelación</DialogTitle>
         <DialogContent>
