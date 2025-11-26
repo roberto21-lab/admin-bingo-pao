@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Button,
   Chip,
   Container,
@@ -17,11 +16,9 @@ import {
 import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getTransactionByIdService, updateTransactionStatusService } from "../Services/transactionService";
-import { getUserById, type User } from "../Services/users.service";
 
 type PurchaseStatus = "pending" | "paid" | "rejected";
 
-// type PurchaseStatus = "pending" | "paid" | "rejected";
 
 type WalletUser = {
   _id: string;
@@ -46,7 +43,7 @@ type Wallet = {
   updated_at: string;
 };
 
-type Transaction = {
+type TransactionDetail = {
   _id: string;
   wallet_id: Wallet;
   transaction_type_id: {
@@ -75,7 +72,7 @@ type Transaction = {
     paidAt: string;        // "2025-11-22T19:16"
     notes: string;
     voucherPreview: string | null;
-    voucherFile: any | null;
+    voucherFile: File | Blob | string | null;
   };
   created_at: string;
   updatedAt: string;
@@ -84,7 +81,7 @@ type Transaction = {
 
 export default function UserPurchaseDetail() {
   const { id } = useParams<{ id: string }>();
-  const [transaction, setTransaction] = React.useState<Transaction | null>(null);
+  const [transaction, setTransaction] = React.useState<TransactionDetail | null>(null);
   const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>("pending");
   const [confirm, setConfirm] = React.useState<"accept" | "cancel" | null>(null);
   const [snack, setSnack] = React.useState({ open: false, msg: "" });
@@ -94,9 +91,9 @@ export default function UserPurchaseDetail() {
     if (!id) return;
 
     const fetchTx = async () => {
-      const data: any = await getTransactionByIdService(id);
-      console.log("🚀 ~ fetchTx ~ data:", data)
-      setTransaction(data);
+      const data = await getTransactionByIdService(id);
+      console.log("🚀 ~ fetchTx ~ data:", data);
+      setTransaction(data as unknown as TransactionDetail);
       // importante: tomamos el estado desde status_id.name
       if (data?.status_id?.name) {
         setLocalStatus(data.status_id.name as PurchaseStatus);
@@ -106,12 +103,10 @@ export default function UserPurchaseDetail() {
     void fetchTx();
   }, [id]);
 
-  const openAccept = async () => {
-      setConfirm("accept");                      // solo si todo salió bien
+  const statusColor: "success" | "warning" | "default" =
+    localStatus === "paid" ? "success" : localStatus === "pending" ? "warning" : "default";
 
- 
-  };
-
+  const openAccept = () => setConfirm("accept");
   const openCancel = () => setConfirm("cancel");
   const closeConfirm = () => setConfirm(null);
 
@@ -142,18 +137,39 @@ export default function UserPurchaseDetail() {
 
     } catch (error) {
       console.error("Error actualizando status:", error);
-      // aquí podrías setear un snackbar de error si quieres
+      setSnack({ open: true, msg: "Error al actualizar la transacción" });
+      return;
     }
-    // aqui deberia de mandar a cerrar el modal
-    navigate(-1);
+    
+    setLocalStatus("paid");
+    setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.` });
     closeConfirm();
+    navigate(-1);
   };
 
   const doCancelPayment = async () => {
     if (!transaction) return;
-    closeConfirm();
+    
+    if (!transaction?._id) {
+      console.error("No hay transactionId para actualizar");
+      return;
+    }
 
-    // ... tu lógica para cancelar
+    try {
+      // TODO: Implementar el servicio para rechazar transacciones
+      // const res = await updateTransactionStatusService(
+      //   transaction._id,
+      //   "ID_DEL_STATUS_REJECTED"
+      // );
+      
+      setLocalStatus("rejected");
+      setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.` });
+      closeConfirm();
+      navigate(-1);
+    } catch (error) {
+      console.error("Error cancelando pago:", error);
+      setSnack({ open: true, msg: "Error al cancelar el pago" });
+    }
   };
 
   return (
@@ -185,6 +201,10 @@ export default function UserPurchaseDetail() {
             <Typography variant="body2" color="text.secondary">
               {transaction?.wallet_id?.user_id?.email}
             </Typography>
+            {/* Estado */}
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+              <Chip size="small" label={`Estado: ${localStatus}`} color={statusColor} />
+            </Stack>
           </Stack>
         </Stack>
 
@@ -297,7 +317,7 @@ export default function UserPurchaseDetail() {
               {transaction?.metadata?.voucherPreview ? (
                 <Box
                   component="img"
-                  src={transaction.metadata.voucherPreview}
+                  src={transaction.metadata.voucherPreview || undefined}
                   alt="Comprobante"
                   sx={{
                     maxWidth: "100%",

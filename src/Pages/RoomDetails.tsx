@@ -23,21 +23,41 @@ import {
 const toNumFlexible = (v?: number | ApiDecimal | null): number | undefined => {
   if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
   if (!v) return undefined;
-  const anyV = v as any;
-  if (typeof anyV.$numberDecimal === "string") {
-    const n = Number(anyV.$numberDecimal);
+  const decimalV = v as { $numberDecimal?: string } | null | undefined;
+  if (decimalV && typeof decimalV.$numberDecimal === "string") {
+    const n = Number(decimalV.$numberDecimal);
     return Number.isFinite(n) ? n : undefined;
   }
   return undefined;
 };
 
-const formatMoney = (n: number, currencyCode: string = "USD") =>
-  new Intl.NumberFormat("es-VE", {
+// Función helper para normalizar VES a Bs
+const normalizeCurrency = (currencyCode?: string | null): string => {
+  if (!currencyCode) return "Bs";
+  const normalized = currencyCode.toLowerCase().trim();
+  return normalized === "ves" ? "Bs" : currencyCode;
+};
+
+const formatMoney = (n: number, currencyCode: string = "Bs"): string => {
+  // Normalizar VES a Bs
+  const normalizedCode = normalizeCurrency(currencyCode);
+  
+  // Si es Bs, usar formato personalizado
+  if (normalizedCode === "Bs") {
+    return new Intl.NumberFormat("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n) + " Bs";
+  }
+  
+  // Para otras monedas (USD, etc.), usar formato de currency estándar
+  return new Intl.NumberFormat("es-VE", {
     style: "currency",
-    currency: currencyCode,
+    currency: normalizedCode,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+};
 
 // status del backend (scheduled, waiting_players, etc.)
 const statusChipFromBackend = (s?: string) => {
@@ -64,25 +84,35 @@ const statusChipFromBackend = (s?: string) => {
 
 // resuelve el código de moneda para Intl y una etiqueta amigable
 const resolveCurrency = (room: ApiRoom | null): { code: string; label: string } => {
-  const anyRoom = room as any;
+  if (!room) return { code: "Bs", label: "Bs" };
+  
+  const anyRoom = room as Record<string, unknown>;
 
   // si viene como "currency": "Bs" | "USD"
   if (typeof anyRoom?.currency === "string") {
-    if (anyRoom.currency === "Bs") return { code: "VES", label: "Bs" };
-    if (anyRoom.currency === "USD") return { code: "USD", label: "USD" };
-    return { code: anyRoom.currency, label: anyRoom.currency };
+    const normalized = normalizeCurrency(anyRoom.currency);
+    if (normalized === "Bs") return { code: "Bs", label: "Bs" };
+    if (normalized === "USD") return { code: "USD", label: "USD" };
+    return { code: normalized, label: normalized };
   }
 
   // si viene poblado currency_id
-  if (anyRoom?.currency_id?.code) {
-    return {
-      code: anyRoom.currency_id.code,
-      label: anyRoom.currency_id.symbol || anyRoom.currency_id.code,
-    };
+  const currencyId = anyRoom?.currency_id;
+  if (currencyId && typeof currencyId === "object" && currencyId !== null) {
+    const currencyObj = currencyId as Record<string, unknown>;
+    if (typeof currencyObj.code === "string") {
+      const normalizedCode = normalizeCurrency(currencyObj.code);
+      const symbolOrCode = typeof currencyObj.symbol === "string" ? currencyObj.symbol : currencyObj.code;
+      const normalizedLabel = normalizeCurrency(symbolOrCode);
+      return {
+        code: normalizedCode,
+        label: normalizedLabel,
+      };
+    }
   }
 
   // fallback
-  return { code: "USD", label: "USD" };
+  return { code: "Bs", label: "Bs" };
 };
 
 export default function RoomDetails() {
@@ -101,50 +131,54 @@ export default function RoomDetails() {
         setLoading(true);
         const data = await getRoomById(id);
         setRoom(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
-        setError(
-          err?.response?.data?.message ||
-            err.message ||
-            "Error al cargar la sala"
-        );
+        const errorMessage = err instanceof Error ? err.message : "Error al cargar la sala";
+        const responseMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setError(responseMessage || errorMessage);
       } finally {
         setLoading(false);
       }
     })();
   }, [id]);
 
-// valores numéricos
-const price = toNumFlexible((room as any)?.price_per_card);
-const totalPot = toNumFlexible((room as any)?.total_pot);
-const adminFeeAmount = toNumFlexible((room as any)?.admin_fee);
-// const totalPrize = toNumFlexible((room as any)?.total_prize); // 💰 tu campo nuevo
+  // valores numéricos
+  const roomData = room as Record<string, unknown> | null;
+  const price = toNumFlexible(roomData?.price_per_card as number | ApiDecimal | null | undefined);
+  const totalPot = toNumFlexible(roomData?.total_pot as number | ApiDecimal | null | undefined);
+  const adminFeeAmount = toNumFlexible(roomData?.admin_fee as number | ApiDecimal | null | undefined);
 
-// rounds con prize_amount
-const rounds = ((room as any)?.rounds ?? []) as Array<{
-  round_number: React.Key | null | undefined;
-  reward: any;
-  round: number;
-  pattern: string;
-  percent: number;
-  prize_amount?: number | ApiDecimal;
-}>;
+  // rounds con prize_amount
+  type RoundReward = {
+    amount?: number | ApiDecimal;
+    pattern?: string;
+    percent?: number;
+  };
 
-const totalPrizeFromBackend = toNumFlexible((room as any)?.total_prize);
+  const rounds = ((roomData?.rounds ?? []) as Array<{
+    round_number: React.Key | null | undefined;
+    reward?: RoundReward;
+    round: number;
+    pattern: string;
+    percent: number;
+    prize_amount?: number | ApiDecimal;
+  }>);
 
-const totalPrize =
-  typeof totalPrizeFromBackend === "number"
-    ? totalPrizeFromBackend
-    : rounds.reduce((acc, r) => {
-        const amount = toNumFlexible(r.prize_amount as any);
-        return acc + (typeof amount === "number" ? amount : 0);
-      }, 0);
+  const totalPrizeFromBackend = toNumFlexible(roomData?.total_prize as number | ApiDecimal | null | undefined);
 
-const playersCount = room?.players?.length ?? 0;
-const rewardsCount = room?.rewards?.length ?? 0;
+  const totalPrize =
+    typeof totalPrizeFromBackend === "number"
+      ? totalPrizeFromBackend
+      : rounds.reduce((acc, r) => {
+          const amount = toNumFlexible(r.prize_amount as number | ApiDecimal | undefined);
+          return acc + (typeof amount === "number" ? amount : 0);
+        }, 0);
 
-// moneda
-const { code: currencyCode, label: currencyLabel } = resolveCurrency(room);
+  const playersCount = room?.players?.length ?? 0;
+  const rewardsCount = room?.rewards?.length ?? 0;
+
+  // moneda
+  const { code: currencyCode, label: currencyLabel } = resolveCurrency(room);
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -187,19 +221,24 @@ const { code: currencyCode, label: currencyLabel } = resolveCurrency(room);
                 <Typography variant="caption" color="text.secondary">
                   Visibilidad:{" "}
                   <strong>
-                    {(room as any).is_public ? "Pública" : "Privada"}
+                    {roomData?.is_public ? "Pública" : "Privada"}
                   </strong>
                 </Typography>
-                {(room as any).scheduled_at && (
-                  <Typography variant="caption" color="text.secondary">
-                    Programada para:{" "}
-                    {new Date((room as any).scheduled_at).toLocaleString()}
-                  </Typography>
-                )}
+                {(() => {
+                  const scheduledAt = roomData?.scheduled_at;
+                  if (scheduledAt && typeof scheduledAt === "string") {
+                    return (
+                      <Typography variant="caption" color="text.secondary">
+                        Programada para: {new Date(scheduledAt).toLocaleString()}
+                      </Typography>
+                    );
+                  }
+                  return null;
+                })()}
               </Stack>
 
               <Stack direction="row" spacing={1} alignItems="center">
-                {statusChipFromBackend((room as any).status)}
+                {statusChipFromBackend(roomData?.status as string | undefined)}
               </Stack>
             </Stack>
 
@@ -313,14 +352,14 @@ const { code: currencyCode, label: currencyLabel } = resolveCurrency(room);
 
     <Stack spacing={1.5} sx={{ mb: 2 }}>
       {rounds.map((r) => {
-        const prizeAmount = toNumFlexible(r.reward?.amount as any);
+        const prizeAmount = toNumFlexible(r.reward?.amount as number | ApiDecimal | undefined);
 
         return (
           <Box
             key={r.round_number}
             sx={{
               borderRadius: 1,
-              border: (t) => `1px solid ${t.palette.divider}`,
+              border: (theme: { palette: { divider: string } }) => `1px solid ${theme.palette.divider}`,
               p: 1.5,
             }}
           >
