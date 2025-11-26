@@ -149,11 +149,32 @@ export default function UserPurchaseDetail() {
 
   const doCancelPayment = async () => {
     if (!transaction) return;
-    
-    if (!transaction?._id) {
+
+    // ... tu lógica para aceptar
+       if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
       return;
     }
+
+    try {
+      const res = await updateTransactionStatusService(
+        transaction._id,                          // 👈 primer parámetro: id de la transacción
+        "6927127e492039cef10c9802"               // 👈 segundo parámetro: status_id
+      );
+
+      console.log("Transacción actualizada:", res.transaction);
+      console.log("Wallet recalculada:", res.wallet);
+
+    } catch (error) {
+      console.error("Error actualizando status:", error);
+      // aquí podrías setear un snackbar de error si quieres
+    }
+    // aqui deberia de mandar a cerrar el modal
+    navigate(-1);
+    closeConfirm();
+
+
+    closeConfirm();
 
     try {
       // TODO: Implementar el servicio para rechazar transacciones

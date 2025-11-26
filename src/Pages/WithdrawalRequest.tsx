@@ -59,7 +59,7 @@ export default function WithdrawalRequest() {
   const [query, setQuery] = React.useState("");
   const [segment, setSegment] = React.useState<SegmentValue>("in_progress");
   const [page, setPage] = React.useState(0);          // 👈 NUEVO
-const [rowsPerPage, setRowsPerPage] = React.useState(10); // 👈 NUEVO
+  const [rowsPerPage, setRowsPerPage] = React.useState(10); // 👈 NUEVO
 
   React.useEffect(() => {
     getWithdrawTransactionsService()
@@ -70,19 +70,19 @@ const [rowsPerPage, setRowsPerPage] = React.useState(10); // 👈 NUEVO
   }, []);
 
   React.useEffect(() => {
-  setPage(0);
-}, [segment, query]);
+    setPage(0);
+  }, [segment, query]);
 
-const handleChangePage = (_: unknown, newPage: number) => {
-  setPage(newPage);
-};
+  const handleChangePage = (_: unknown, newPage: number) => {
+    setPage(newPage);
+  };
 
-const handleChangeRowsPerPage = (
-  event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-) => {
-  setRowsPerPage(parseInt(event.target.value, 10));
-  setPage(0);
-};
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const handleQuery = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -136,23 +136,23 @@ const handleChangeRowsPerPage = (
   }
 
 
-//   let currentData: any[] = [];
-// let currentTitle = "";
+  //   let currentData: any[] = [];
+  // let currentTitle = "";
 
-if (segment === "in_progress") {
-  currentData = inProgress;
-  currentTitle = "En progreso";
-} else if (segment === "completed") {
-  currentData = completed;
-  currentTitle = "Completadas";
-} else {
-  currentData = rejected;
-  currentTitle = "Rechazadas";
-}
+  if (segment === "in_progress") {
+    currentData = inProgress;
+    currentTitle = "En progreso";
+  } else if (segment === "completed") {
+    currentData = completed;
+    currentTitle = "Completadas";
+  } else {
+    currentData = rejected;
+    currentTitle = "Rechazadas";
+  }
 
-// 👇 NUEVO: slice para paginar
-const paginatedData =
-  currentData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // 👇 NUEVO: slice para paginar
+  const paginatedData =
+    currentData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
 
   return (
@@ -166,30 +166,36 @@ const paginatedData =
         sx={{ mb: 2 }}
       >
         <Typography variant="h6" fontWeight={800}>
-          Solicitudes de recarga
+          Solicitudes de retiro
         </Typography>
 
-        <TextField
-          placeholder="Buscar por nombre, banco o referencia…"
-          value={query}
-          onChange={handleQuery}
-          size="small"
-          sx={{ minWidth: { xs: "100%", sm: 280 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-        />
+
       </Stack>
 
-      <Stack
-        direction="row"
-        justifyContent="flex-end"
-        sx={{ mb: 2 }}
-      >
+      <TextField
+        placeholder="Buscar por nombre, banco o referencia…"
+        value={query}
+        onChange={handleQuery}
+        size="small"
+        sx={{ width: '100%', mb: 2 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
+
+
+
+      {/* <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1, mt: 2 }}>
+        {currentTitle} — {currentData.length} registros
+      </Typography> */}
+
+    
+
+      <Stack sx={{ mb: 1, width: "100%" }}>
         <ToggleButtonGroup
           value={segment}
           exclusive
@@ -197,164 +203,176 @@ const paginatedData =
             if (value) setSegment(value);
           }}
           size="small"
+          sx={{
+            width: "100%",
+            display: "flex",
+          }}
         >
-          <ToggleButton value="in_progress">
+          <ToggleButton
+            value="in_progress"
+            sx={{ flex: 1 }}   // Ocupa mismo espacio
+          >
             En progreso ({inProgress.length})
           </ToggleButton>
-          <ToggleButton value="completed">
+
+          <ToggleButton
+            value="completed"
+            sx={{ flex: 1 }}
+          >
             Completadas ({completed.length})
           </ToggleButton>
-          <ToggleButton value="rejected">
+
+          <ToggleButton
+            value="rejected"
+            sx={{ flex: 1 }}
+          >
             Rechazadas ({rejected.length})
           </ToggleButton>
         </ToggleButtonGroup>
       </Stack>
 
-      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-        {currentTitle} — {currentData.length} registros
-      </Typography>
 
       <TableContainer
-  component={Paper}
-  sx={{
-    mt: 1,
-    borderRadius: 3,
-    overflow: "hidden",
-    border: "1px solid",
-    borderColor: "divider",
-  }}
->
-  <Table size="small">
-    <TableHead>
-      <TableRow>
-        <TableCell sx={{ fontWeight: 700 }}>Nombre / Banco</TableCell>
-        <TableCell sx={{ fontWeight: 700 }}>Estado</TableCell>
-        <TableCell sx={{ fontWeight: 700 }} align="right">
-          Monto
-        </TableCell>
-        <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
-        <TableCell sx={{ fontWeight: 700 }} align="right">
-          Acciones
-        </TableCell>
-      </TableRow>
-    </TableHead>
-
-    <TableBody>
-      {currentData.length === 0 ? (
-        <TableRow>
-          <TableCell
-            colSpan={5}
-            align="center"
-            sx={{ py: 4, color: "text.secondary" }}
-          >
-            (Sin registros para este estado)
-          </TableCell>
-        </TableRow>
-      ) : (
-        paginatedData.map((t: any) => {          // 👈 AQUÍ USAMOS paginatedData
-          const amount = Number(
-            t.amount?.$numberDecimal ?? t.amount ?? 0
-          );
-          const date = new Date(t.created_at ?? t.updatedAt);
-
-          const name =
-            t.metadata?.bankName ||
-            t.metadata?.reference_code ||
-            t.metadata?.refCode ||
-            t.transaction_type_id?.name ||
-            "Transacción";
-
-          const rawStatus = t.status_id?.name?.toLowerCase?.();
-          let statusLabel = "Sin estado";
-          let statusColor:
-            | "default"
-            | "success"
-            | "warning"
-            | "error" = "default";
-
-          if (!rawStatus) {
-            statusLabel = "Pendiente";
-            statusColor = "warning";
-          } else if (rawStatus === "completed") {
-            statusLabel = "Completado";
-            statusColor = "success";
-          } else if (rawStatus === "rejected") {
-            statusLabel = "Rechazado";
-            statusColor = "error";
-          } else {
-            statusLabel = t.status_id.name;
-          }
-
-          return (
-            <TableRow key={t._id} hover>
-              {/* Nombre / Banco */}
-              <TableCell>
-                <strong>
-                  {t.wallet_id?.user_id?.name ?? "Usuario"}
-                </strong>
-                <div style={{ fontSize: 12, color: "#777" }}>
-                  {name}
-                  {t.metadata?.refCode ||
-                  t.metadata?.reference_code ? (
-                    <>
-                      {" "}
-                      — Ref:{" "}
-                      {t.metadata.refCode ??
-                        t.metadata.reference_code}
-                    </>
-                  ) : null}
-                </div>
+        component={Paper}
+        sx={{
+          mt: 1,
+          borderRadius: 3,
+          overflow: "hidden",
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700 }}>Nombre / Banco</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Estado</TableCell>
+              <TableCell sx={{ fontWeight: 700 }} align="right">
+                Monto
               </TableCell>
-
-              {/* Estado */}
-              <TableCell>
-                <Chip
-                  label={statusLabel}
-                  size="small"
-                  color={statusColor}
-                  variant={
-                    statusColor === "default" ? "outlined" : "filled"
-                  }
-                />
-              </TableCell>
-
-              {/* Monto */}
-              <TableCell align="right">
-                {formatMoney(amount)} {t.currency_id?.symbol ?? ""}
-              </TableCell>
-
-              {/* Fecha */}
-              <TableCell>{date.toLocaleString()}</TableCell>
-
-              {/* Acciones */}
-              <TableCell align="right">
-                <IconButton
-                  size="small"
-                  onClick={() => onView(t)}
-                  aria-label="ver"
-                >
-                  <VisibilityIcon fontSize="small" />
-                </IconButton>
+              <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
+              <TableCell sx={{ fontWeight: 700 }} align="right">
+                Acciones
               </TableCell>
             </TableRow>
-          );
-        })
-      )}
-    </TableBody>
-  </Table>
+          </TableHead>
 
-  {/* 🔹 Paginador */}
-  <TablePagination
-    component="div"
-    count={currentData.length}          // total de registros del estado actual
-    page={page}
-    onPageChange={handleChangePage}
-    rowsPerPage={rowsPerPage}
-    onRowsPerPageChange={handleChangeRowsPerPage}
-    rowsPerPageOptions={[10, 25, 50]}  // o [10] si quieres fijo en 10
-    labelRowsPerPage="Filas por página"
-  />
-</TableContainer>
+          <TableBody>
+            {currentData.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  align="center"
+                  sx={{ py: 4, color: "text.secondary" }}
+                >
+                  (Sin registros para este estado)
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedData.map((t: any) => {          // 👈 AQUÍ USAMOS paginatedData
+                const amount = Number(
+                  t.amount?.$numberDecimal ?? t.amount ?? 0
+                );
+                const date = new Date(t.created_at ?? t.updatedAt);
+
+                const name =
+                  t.metadata?.bankName ||
+                  t.metadata?.reference_code ||
+                  t.metadata?.refCode ||
+                  t.transaction_type_id?.name ||
+                  "Transacción";
+
+                const rawStatus = t.status_id?.name?.toLowerCase?.();
+                let statusLabel = "Sin estado";
+                let statusColor:
+                  | "default"
+                  | "success"
+                  | "warning"
+                  | "error" = "default";
+
+                if (!rawStatus) {
+                  statusLabel = "Pendiente";
+                  statusColor = "warning";
+                } else if (rawStatus === "completed") {
+                  statusLabel = "Completado";
+                  statusColor = "success";
+                } else if (rawStatus === "rejected") {
+                  statusLabel = "Rechazado";
+                  statusColor = "error";
+                } else {
+                  statusLabel = t.status_id.name;
+                }
+
+                return (
+                  <TableRow key={t._id} hover>
+                    {/* Nombre / Banco */}
+                    <TableCell>
+                      <strong>
+                        {t.wallet_id?.user_id?.name ?? "Usuario"}
+                      </strong>
+                      <div style={{ fontSize: 12, color: "#777" }}>
+                        {name}
+                        {t.metadata?.refCode ||
+                          t.metadata?.reference_code ? (
+                          <>
+                            {" "}
+                            — Ref:{" "}
+                            {t.metadata.refCode ??
+                              t.metadata.reference_code}
+                          </>
+                        ) : null}
+                      </div>
+                    </TableCell>
+
+                    {/* Estado */}
+                    <TableCell>
+                      <Chip
+                        label={statusLabel}
+                        size="small"
+                        color={statusColor}
+                        variant={
+                          statusColor === "default" ? "outlined" : "filled"
+                        }
+                      />
+                    </TableCell>
+
+                    {/* Monto */}
+                    <TableCell align="right">
+                      {formatMoney(amount)} {t.currency_id?.symbol ?? ""}
+                    </TableCell>
+
+                    {/* Fecha */}
+                    <TableCell>{date.toLocaleString()}</TableCell>
+
+                    {/* Acciones */}
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        onClick={() => onView(t)}
+                        aria-label="ver"
+                      >
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+
+        {/* 🔹 Paginador */}
+        <TablePagination
+          component="div"
+          count={currentData.length}          // total de registros del estado actual
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50]}  // o [10] si quieres fijo en 10
+          labelRowsPerPage="Filas por página"
+        />
+      </TableContainer>
 
     </Container>
   );

@@ -168,50 +168,63 @@ const paginatedData =
           Solicitudes de recarga
         </Typography>
 
-        <TextField
-          placeholder="Buscar por nombre, banco o referencia…"
-          value={query}
-          onChange={handleQuery}
-          size="small"
-          sx={{ minWidth: { xs: "100%", sm: 280 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-        />
       </Stack>
+       <TextField
+        placeholder="Buscar por nombre, banco o referencia…"
+        value={query}
+        onChange={handleQuery}
+        size="small"
+        sx={{ width: '100%', mb: 2 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" />
+            </InputAdornment>
+          ),
+        }}
+      />
 
-      <Stack
-        direction="row"
-        justifyContent="flex-end"
-        sx={{ mb: 2 }}
-      >
-        <ToggleButtonGroup
-          value={segment}
-          exclusive
-          onChange={(_, value) => {
-            if (value) setSegment(value);
-          }}
-          size="small"
-        >
-          <ToggleButton value="in_progress">
-            En progreso ({inProgress.length})
-          </ToggleButton>
-          <ToggleButton value="completed">
-            Completadas ({completed.length})
-          </ToggleButton>
-          <ToggleButton value="rejected">
-            Rechazadas ({rejected.length})
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
-
-      <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+          {/* <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
         {currentTitle} — {currentData.length} registros
-      </Typography>
+      </Typography> */}
+
+    <Stack sx={{ mb: 1, width: "100%" }}>
+            <ToggleButtonGroup
+              value={segment}
+              exclusive
+              onChange={(_, value) => {
+                if (value) setSegment(value);
+              }}
+              size="small"
+              sx={{
+                width: "100%",
+                display: "flex",
+              }}
+            >
+              <ToggleButton
+                value="in_progress"
+                sx={{ flex: 1 }}   // Ocupa mismo espacio
+              >
+                En progreso ({inProgress.length})
+              </ToggleButton>
+    
+              <ToggleButton
+                value="completed"
+                sx={{ flex: 1 }}
+              >
+                Completadas ({completed.length})
+              </ToggleButton>
+    
+              <ToggleButton
+                value="rejected"
+                sx={{ flex: 1 }}
+              >
+                Rechazadas ({rejected.length})
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+
+    
 
       <TableContainer
   component={Paper}
