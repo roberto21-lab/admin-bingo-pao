@@ -15,9 +15,9 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTransactionByIdService, updateTransactionStatusService } from "../Services/transactionService";
+import { getTransactionByIdService, updateTransactionStatusService, getTransactionStatusesService } from "../Services/transactionService";
 
-type PurchaseStatus = "pending" | "paid" | "rejected";
+type PurchaseStatus = "pending" | "completed" | "rejected";
 
 
 type WalletUser = {
@@ -84,7 +84,23 @@ export default function UserPurchaseDetail() {
   const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>("pending");
   const [confirm, setConfirm] = React.useState<"accept" | "cancel" | null>(null);
   const [snack, setSnack] = React.useState({ open: false, msg: "" });
+  const [transactionStatuses, setTransactionStatuses] = React.useState<Array<{ _id: string; name: string; category: string }>>([]);
   const navigate = useNavigate();
+
+  // Obtener los status de transactions al cargar
+  React.useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const statuses = await getTransactionStatusesService();
+        setTransactionStatuses(statuses);
+        console.log("📋 Status de transactions obtenidos:", statuses);
+      } catch (error) {
+        console.error("Error obteniendo status de transactions:", error);
+      }
+    };
+
+    void fetchStatuses();
+  }, []);
 
   React.useEffect(() => {
     if (!id) return;
@@ -101,8 +117,8 @@ export default function UserPurchaseDetail() {
     void fetchTx();
   }, [id]);
 
-  const statusColor: "success" | "warning" | "default" =
-    localStatus === "paid" ? "success" : localStatus === "pending" ? "warning" : "default";
+  const statusColor: "success" | "warning" | "default" | "error" =
+    localStatus === "completed" ? "success" : localStatus === "pending" ? "warning" : localStatus === "rejected" ? "error" : "default";
 
   const openAccept = () => setConfirm("accept");
   const openCancel = () => setConfirm("cancel");
@@ -118,58 +134,60 @@ export default function UserPurchaseDetail() {
 
   const doAccept = async () => {
     if (!transaction) return;
-       if (!transaction?._id) {
+    if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
+      return;
+    }
+
+    // Buscar el status "completed"
+    const completedStatus = transactionStatuses.find(s => s.name.toLowerCase() === "completed");
+    if (!completedStatus) {
+      console.error("Status 'completed' no encontrado");
+      setSnack({ open: true, msg: "Error: Status 'completed' no encontrado. Ejecute 'npm run seed' en el backend." });
       return;
     }
 
     try {
       const res = await updateTransactionStatusService(
         transaction._id,                         
-        "6925f9fb1f86e6e6acac19c4"           
+        completedStatus._id
       );
 
-
+      console.log("🚀 ~ doAccept ~ res:", res);
+      setLocalStatus("completed");
+      setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.` });
+      closeConfirm();
+      navigate(-1);
     } catch (error) {
       console.error("Error actualizando status:", error);
       setSnack({ open: true, msg: "Error al actualizar la transacción" });
       return;
     }
-    
-    setLocalStatus("paid");
-    setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.` });
-    closeConfirm();
-    navigate(-1);
   };
 
   const doCancelPayment = async () => {
     if (!transaction) return;
-
-       if (!transaction?._id) {
+    if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
+      return;
+    }
+
+    // Buscar el status "rejected"
+    const rejectedStatus = transactionStatuses.find(s => s.name.toLowerCase() === "rejected");
+    if (!rejectedStatus) {
+      console.error("Status 'rejected' no encontrado");
+      setSnack({ open: true, msg: "Error: Status 'rejected' no encontrado. Ejecute 'npm run seed' en el backend." });
       return;
     }
 
     try {
       const res = await updateTransactionStatusService(
         transaction._id,                          
-        "6927127e492039cef10c9802"             
+        rejectedStatus._id
       );
 
       console.log("Transacción actualizada:", res.transaction);
       console.log("Wallet recalculada:", res.wallet);
-
-    } catch (error) {
-      console.error("Error actualizando status:", error);
-    }
-    navigate(-1);
-    closeConfirm();
-
-
-    closeConfirm();
-
-    try {
-   
       setLocalStatus("rejected");
       setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.` });
       closeConfirm();
