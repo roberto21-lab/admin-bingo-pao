@@ -54,6 +54,7 @@ export default function LoadRequest() {
   const navigate = useNavigate();
 
   const [transactions, setTransactions] = React.useState<Transaction[]>([]);
+  console.log("🚀 ~ LoadRequest ~ transactions:", transactions)
   const [query, setQuery] = React.useState("");
   const [segment, setSegment] = React.useState<SegmentValue>("in_progress");
   const [page, setPage] = React.useState(0);          // 👈 NUEVO

@@ -15,10 +15,12 @@ import {
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTransactionByIdService, updateTransactionStatusService, getTransactionStatusesService } from "../Services/transactionService";
+import {
+  getTransactionByIdService,
+  updateTransactionStatusService,
+} from "../Services/transactionService";
 
-type PurchaseStatus = "pending" | "completed" | "rejected";
-
+type PurchaseStatus = "pending" | "paid" | "rejected";
 
 type WalletUser = {
   _id: string;
@@ -26,21 +28,43 @@ type WalletUser = {
   email: string;
 };
 
+type Currency = {
+  _id: string;
+  code: string;
+  name: string;
+  symbol: string; // "Bs"
+  is_active: boolean;
+  roles: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 type Wallet = {
   _id: string;
   user_id: WalletUser;
-  currency_id: {
-    _id: string;
-    code: string;
-    name: string;
-    symbol: string; // "Bs"
-    is_active: boolean;
-    roles: string[];
-    created_at: string;
-    updated_at: string;
-  };
+  currency_id: Currency;
   created_at: string;
   updated_at: string;
+};
+
+type TransactionStatus = {
+  _id: string;
+  name: PurchaseStatus;
+  category: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type TransactionMetadata = {
+  bank_name: string;
+  document_type_id: string;
+  document_number: string;
+  phone_number: string;
+  amount: number;          // en tu JSON viene como number
+  reference_code: string;
+  payment_date: string;
+  // opcionalmente puedes soportar esto si en el futuro guardas imagen
+  voucherPreview?: string | null;
 };
 
 type TransactionDetail = {
@@ -48,32 +72,15 @@ type TransactionDetail = {
   wallet_id: Wallet;
   transaction_type_id: {
     _id: string;
-    name: string; 
+    name: string;
     description: string;
     created_at: string;
     updated_at: string;
   };
-  amount: { $numberDecimal: string }; 
-  currency_id: Wallet["currency_id"];
-  status_id: {
-    _id: string;
-    name: PurchaseStatus; 
-    category: string;
-    created_at: string;
-    updated_at: string;
-  };
-  metadata: {
-    refCode: string;
-    bankName: string;
-    payerDocType: "V" | "E";
-    payerDocId: string;
-    payerPhone: string;
-    amount: string;      
-    paidAt: string;      
-    notes: string;
-    voucherPreview: string | null;
-    voucherFile: File | Blob | string | null;
-  };
+  amount: { $numberDecimal: string };
+  currency_id: Currency;
+  status_id: TransactionStatus | null; // 👈 en el JSON viene null
+  metadata: TransactionMetadata;
   created_at: string;
   updatedAt: string;
 };
@@ -84,23 +91,7 @@ export default function UserPurchaseDetail() {
   const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>("pending");
   const [confirm, setConfirm] = React.useState<"accept" | "cancel" | null>(null);
   const [snack, setSnack] = React.useState({ open: false, msg: "" });
-  const [transactionStatuses, setTransactionStatuses] = React.useState<Array<{ _id: string; name: string; category: string }>>([]);
   const navigate = useNavigate();
-
-  // Obtener los status de transactions al cargar
-  React.useEffect(() => {
-    const fetchStatuses = async () => {
-      try {
-        const statuses = await getTransactionStatusesService();
-        setTransactionStatuses(statuses);
-        console.log("📋 Status de transactions obtenidos:", statuses);
-      } catch (error) {
-        console.error("Error obteniendo status de transactions:", error);
-      }
-    };
-
-    void fetchStatuses();
-  }, []);
 
   React.useEffect(() => {
     if (!id) return;
@@ -108,17 +99,22 @@ export default function UserPurchaseDetail() {
     const fetchTx = async () => {
       const data = await getTransactionByIdService(id);
       console.log("🚀 ~ fetchTx ~ data:", data);
+
       setTransaction(data as unknown as TransactionDetail);
+
       if (data?.status_id?.name) {
         setLocalStatus(data.status_id.name as PurchaseStatus);
+      } else {
+        // Si no tiene status_id, lo tratamos como pending
+        setLocalStatus("pending");
       }
     };
 
     void fetchTx();
   }, [id]);
 
-  const statusColor: "success" | "warning" | "default" | "error" =
-    localStatus === "completed" ? "success" : localStatus === "pending" ? "warning" : localStatus === "rejected" ? "error" : "default";
+  const statusColor: "success" | "warning" | "default" =
+    localStatus === "paid" ? "success" : localStatus === "pending" ? "warning" : "default";
 
   const openAccept = () => setConfirm("accept");
   const openCancel = () => setConfirm("cancel");
@@ -133,63 +129,49 @@ export default function UserPurchaseDetail() {
   };
 
   const doAccept = async () => {
-    if (!transaction) return;
-       if (!transaction?._id) {
+    if (!transaction || !transaction._id) {
       console.error("No hay transactionId para actualizar");
-      return;
-    }
-
-    // Buscar el status "completed"
-    const completedStatus = transactionStatuses.find(s => s.name.toLowerCase() === "completed");
-    if (!completedStatus) {
-      console.error("Status 'completed' no encontrado");
-      setSnack({ open: true, msg: "Error: Status 'completed' no encontrado. Ejecute 'npm run seed' en el backend." });
       return;
     }
 
     try {
       const res = await updateTransactionStatusService(
-        transaction._id,                         
-        completedStatus._id
+        transaction._id,
+        "6925f9fb1f86e6e6acac19c4" // ID de status "paid"
       );
 
-      console.log("🚀 ~ doAccept ~ res:", res);
-      setLocalStatus("completed");
-      setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.` });
+      console.log("Transacción actualizada:", res);
+      setLocalStatus("paid");
+      setSnack({
+        open: true,
+        msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.`,
+      });
       closeConfirm();
       navigate(-1);
     } catch (error) {
       console.error("Error actualizando status:", error);
       setSnack({ open: true, msg: "Error al actualizar la transacción" });
-      return;
     }
   };
 
   const doCancelPayment = async () => {
-    if (!transaction) return;
-       if (!transaction?._id) {
+    if (!transaction || !transaction._id) {
       console.error("No hay transactionId para actualizar");
-      return;
-    }
-
-    // Buscar el status "rejected"
-    const rejectedStatus = transactionStatuses.find(s => s.name.toLowerCase() === "rejected");
-    if (!rejectedStatus) {
-      console.error("Status 'rejected' no encontrado");
-      setSnack({ open: true, msg: "Error: Status 'rejected' no encontrado. Ejecute 'npm run seed' en el backend." });
       return;
     }
 
     try {
       const res = await updateTransactionStatusService(
-        transaction._id,                          
-        rejectedStatus._id
+        transaction._id,
+        "6927127e492039cef10c9802" // ID de status "rejected"
       );
 
-      console.log("Transacción actualizada:", res.transaction);
-      console.log("Wallet recalculada:", res.wallet);
+      console.log("Transacción actualizada:", res);
       setLocalStatus("rejected");
-      setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.` });
+      setSnack({
+        open: true,
+        msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.`,
+      });
       closeConfirm();
       navigate(-1);
     } catch (error) {
@@ -198,8 +180,11 @@ export default function UserPurchaseDetail() {
     }
   };
 
+  const metadata = transaction?.metadata;
+
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
+      {/* Header */}
       <Stack
         direction="row"
         alignItems="center"
@@ -215,6 +200,7 @@ export default function UserPurchaseDetail() {
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        {/* Datos del usuario */}
         <Stack direction="row" spacing={2} alignItems="center">
           <Stack spacing={0.5}>
             <Typography variant="subtitle1" fontWeight={700}>
@@ -224,6 +210,7 @@ export default function UserPurchaseDetail() {
             <Typography variant="body2" color="text.secondary">
               {transaction?.wallet_id?.user_id?.email}
             </Typography>
+
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
               <Chip size="small" label={`Estado: ${localStatus}`} color={statusColor} />
             </Stack>
@@ -232,6 +219,7 @@ export default function UserPurchaseDetail() {
 
         <Divider sx={{ my: 2 }} />
 
+        {/* Fecha + estado */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={4}
@@ -241,7 +229,7 @@ export default function UserPurchaseDetail() {
             <Typography variant="caption" color="text.secondary">
               Fecha de solicitud
             </Typography>
-            <Typography>{transaction?.metadata?.paidAt}</Typography>
+            <Typography>{metadata?.payment_date}</Typography>
           </Stack>
 
           <Stack spacing={0.5}>
@@ -249,7 +237,7 @@ export default function UserPurchaseDetail() {
               Estado
             </Typography>
             <Typography sx={{ textTransform: "capitalize" }}>
-              {transaction?.status_id?.name}
+              {transaction?.status_id?.name ?? "pending"}
             </Typography>
           </Stack>
         </Stack>
@@ -263,13 +251,14 @@ export default function UserPurchaseDetail() {
           spacing={2.5}
           alignItems={{ md: "flex-start" }}
         >
+          {/* Columna de texto */}
           <Stack spacing={1.25} sx={{ flex: 1, minWidth: 260 }}>
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
                 Banco
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.bankName}
+                {metadata?.bank_name}
               </Typography>
             </Stack>
 
@@ -278,9 +267,7 @@ export default function UserPurchaseDetail() {
                 Monto ({transaction?.currency_id?.symbol ?? "Bs"})
               </Typography>
               <Typography fontWeight={600}>
-                {formatBs(
-                  Number(transaction?.metadata?.amount ?? "0")
-                )}
+                {formatBs(metadata?.amount ?? 0)}
               </Typography>
             </Stack>
 
@@ -289,18 +276,16 @@ export default function UserPurchaseDetail() {
                 Teléfono (Pago móvil)
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.payerPhone}
+                {metadata?.phone_number}
               </Typography>
             </Stack>
 
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
-                Cédula
+                Cédula / Documento
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.payerDocType}
-                {"-"}
-                {transaction?.metadata?.payerDocId}
+                {metadata?.document_number}
               </Typography>
             </Stack>
 
@@ -309,11 +294,12 @@ export default function UserPurchaseDetail() {
                 N° de referencia
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.refCode}
+                {metadata?.reference_code}
               </Typography>
             </Stack>
           </Stack>
 
+          {/* Comprobante */}
           <Box sx={{ flex: 1, width: "100%" }}>
             <Typography variant="caption" color="text.secondary">
               Comprobante
@@ -332,10 +318,10 @@ export default function UserPurchaseDetail() {
                 bgcolor: "background.default",
               }}
             >
-              {transaction?.metadata?.voucherPreview ? (
+              {metadata?.voucherPreview ? (
                 <Box
                   component="img"
-                  src={transaction.metadata.voucherPreview || undefined}
+                  src={metadata.voucherPreview || undefined}
                   alt="Comprobante"
                   sx={{
                     maxWidth: "100%",
@@ -353,6 +339,7 @@ export default function UserPurchaseDetail() {
           </Box>
         </Stack>
 
+        {/* Botones de acción */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -378,21 +365,20 @@ export default function UserPurchaseDetail() {
         </Stack>
       </Paper>
 
+      {/* Diálogo aceptar */}
       <Dialog open={confirm === "accept"} onClose={closeConfirm}>
         <DialogTitle>Confirmar aceptación</DialogTitle>
         <DialogContent>
           ¿Confirmas que el pago de{" "}
           <b>{transaction?.wallet_id?.user_id?.name}</b> es válido?
           <br />
-          Banco: <b>{transaction?.metadata?.bankName}</b> — Monto:{" "}
+          Banco: <b>{metadata?.bank_name}</b> — Monto:{" "}
           <b>
             {transaction?.currency_id?.symbol ?? "Bs"}{" "}
-            {formatBs(
-              Number(transaction?.metadata?.amount ?? "0")
-            )}
+            {formatBs(metadata?.amount ?? 0)}
           </b>
           <br />
-          Ref: <b>{transaction?.metadata?.refCode}</b>
+          Ref: <b>{metadata?.reference_code}</b>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeConfirm}>Cancelar</Button>
@@ -402,13 +388,14 @@ export default function UserPurchaseDetail() {
         </DialogActions>
       </Dialog>
 
+      {/* Diálogo cancelar */}
       <Dialog open={confirm === "cancel"} onClose={closeConfirm}>
         <DialogTitle>Confirmar cancelación</DialogTitle>
         <DialogContent>
           ¿Seguro que deseas <b>cancelar</b> el pago de{" "}
           <b>{transaction?.wallet_id?.user_id?.name}</b>?
           <br />
-          Ref: <b>{transaction?.metadata?.refCode}</b>
+          Ref: <b>{metadata?.reference_code}</b>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeConfirm}>No</Button>
@@ -422,6 +409,7 @@ export default function UserPurchaseDetail() {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar */}
       <Snackbar
         open={snack.open}
         onClose={() => setSnack({ open: false, msg: "" })}
@@ -431,4 +419,3 @@ export default function UserPurchaseDetail() {
     </Container>
   );
 }
-
