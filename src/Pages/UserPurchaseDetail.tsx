@@ -134,7 +134,7 @@ export default function UserPurchaseDetail() {
 
   const doAccept = async () => {
     if (!transaction) return;
-    if (!transaction?._id) {
+       if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
       return;
     }
@@ -167,7 +167,7 @@ export default function UserPurchaseDetail() {
 
   const doCancelPayment = async () => {
     if (!transaction) return;
-    if (!transaction?._id) {
+       if (!transaction?._id) {
       console.error("No hay transactionId para actualizar");
       return;
     }
