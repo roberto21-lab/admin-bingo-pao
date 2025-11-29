@@ -1,7 +1,7 @@
 // src/services/transactionService.ts
 import axios from "axios";
 
-const API_URL = "http://localhost:3000"; // ⬅️ misma base que usas en otros servicios
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Ajusta el tipo según tu modelo de Transaction en el backend
 export type Transaction = {
