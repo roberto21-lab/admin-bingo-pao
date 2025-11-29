@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Chip,
   Container,
@@ -11,14 +12,16 @@ import {
   Snackbar,
   Stack,
   Typography,
-  Box,
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTransactionByIdService, updateTransactionStatusService, getTransactionStatusesService } from "../Services/transactionService";
+import {
+  getTransactionByIdService,
+  updateTransactionStatusService,
+} from "../Services/transactionService";
+import { getStatusesService } from "../Services/status.service";
 
-type PurchaseStatus = "pending" | "completed" | "rejected";
-
+type PurchaseStatus = "pending" | "paid" | "rejected";
 
 type WalletUser = {
   _id: string;
@@ -26,21 +29,43 @@ type WalletUser = {
   email: string;
 };
 
+type Currency = {
+  _id: string;
+  code: string;
+  name: string;
+  symbol: string; // "Bs"
+  is_active: boolean;
+  roles: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 type Wallet = {
   _id: string;
   user_id: WalletUser;
-  currency_id: {
-    _id: string;
-    code: string;
-    name: string;
-    symbol: string; // "Bs"
-    is_active: boolean;
-    roles: string[];
-    created_at: string;
-    updated_at: string;
-  };
+  currency_id: Currency;
   created_at: string;
   updated_at: string;
+};
+
+type TransactionStatus = {
+  _id: string;
+  name: PurchaseStatus;
+  category: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type TransactionMetadata = {
+  bankName: string;
+  documentTypeId: string;
+  payerDocId: string;
+  payerPhone: string;
+  amount: number;          // en tu JSON viene como number
+  refCode: string;
+  paidAt: string;
+  // opcionalmente puedes soportar esto si en el futuro guardas imagen
+  voucherPreview?: string | null;
 };
 
 type TransactionDetail = {
@@ -48,32 +73,15 @@ type TransactionDetail = {
   wallet_id: Wallet;
   transaction_type_id: {
     _id: string;
-    name: string; 
+    name: string;
     description: string;
     created_at: string;
     updated_at: string;
   };
-  amount: { $numberDecimal: string }; 
-  currency_id: Wallet["currency_id"];
-  status_id: {
-    _id: string;
-    name: PurchaseStatus; 
-    category: string;
-    created_at: string;
-    updated_at: string;
-  };
-  metadata: {
-    refCode: string;
-    bankName: string;
-    payerDocType: "V" | "E";
-    payerDocId: string;
-    payerPhone: string;
-    amount: string;      
-    paidAt: string;      
-    notes: string;
-    voucherPreview: string | null;
-    voucherFile: File | Blob | string | null;
-  };
+  amount: { $numberDecimal: string };
+  currency_id: Currency;
+  status_id: TransactionStatus | null; // 👈 en el JSON viene null
+  metadata: TransactionMetadata;
   created_at: string;
   updatedAt: string;
 };
@@ -84,23 +92,33 @@ export default function UserPurchaseDetail() {
   const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>("pending");
   const [confirm, setConfirm] = React.useState<"accept" | "cancel" | null>(null);
   const [snack, setSnack] = React.useState({ open: false, msg: "" });
-  const [transactionStatuses, setTransactionStatuses] = React.useState<Array<{ _id: string; name: string; category: string }>>([]);
+  const [statuses, setStatuses] = React.useState<any[]>([]);
+  const [statusesLoading, setStatusesLoading] = React.useState(false);
+  console.log("🚀 ~ UserPurchaseDetail ~ statusesLoading:", statusesLoading)
+  console.log("🚀 ~ UserPurchaseDetail ~ statuses:", statuses)
   const navigate = useNavigate();
 
-  // Obtener los status de transactions al cargar
-  React.useEffect(() => {
-    const fetchStatuses = async () => {
-      try {
-        const statuses = await getTransactionStatusesService();
-        setTransactionStatuses(statuses);
-        console.log("📋 Status de transactions obtenidos:", statuses);
-      } catch (error) {
-        console.error("Error obteniendo status de transactions:", error);
-      }
-    };
+React.useEffect(() => {
+  const fetchStatuses = async () => {
+    try {
+      console.log("🔥 Entrando a fetchStatuses");
+      setStatusesLoading(true); // 👈 ya no usamos setLoading
 
-    void fetchStatuses();
-  }, []);
+      const data = await getStatusesService();
+      console.log("🚀 ~ fetchStatuses ~ data:", data);
+
+      setStatuses(data);
+    } catch (err) {
+      console.error("Error cargando statuses:", err);
+    } finally {
+      setStatusesLoading(false); // 👈 igual aquí
+    }
+  };
+
+  fetchStatuses();
+}, []);
+
+
 
   React.useEffect(() => {
     if (!id) return;
@@ -108,17 +126,22 @@ export default function UserPurchaseDetail() {
     const fetchTx = async () => {
       const data = await getTransactionByIdService(id);
       console.log("🚀 ~ fetchTx ~ data:", data);
+
       setTransaction(data as unknown as TransactionDetail);
+
       if (data?.status_id?.name) {
         setLocalStatus(data.status_id.name as PurchaseStatus);
+      } else {
+        // Si no tiene status_id, lo tratamos como pending
+        setLocalStatus("pending");
       }
     };
 
     void fetchTx();
   }, [id]);
 
-  const statusColor: "success" | "warning" | "default" | "error" =
-    localStatus === "completed" ? "success" : localStatus === "pending" ? "warning" : localStatus === "rejected" ? "error" : "default";
+  const statusColor: "success" | "warning" | "default" =
+    localStatus === "paid" ? "success" : localStatus === "pending" ? "warning" : "default";
 
   const openAccept = () => setConfirm("accept");
   const openCancel = () => setConfirm("cancel");
@@ -132,64 +155,74 @@ export default function UserPurchaseDetail() {
     });
   };
 
+  // ID del status "completed" (category: transaction)
+const completedStatusId = React.useMemo(() => {
+  const status = statuses.find((s) => s.name === "completed");
+  return status?._id || null;
+}, [statuses]);
+
   const doAccept = async () => {
-    if (!transaction) return;
-       if (!transaction?._id) {
-      console.error("No hay transactionId para actualizar");
-      return;
-    }
+  if (!transaction || !transaction._id) {
+    console.error("No hay transactionId para actualizar");
+    return;
+  }
 
-    // Buscar el status "completed"
-    const completedStatus = transactionStatuses.find(s => s.name.toLowerCase() === "completed");
-    if (!completedStatus) {
-      console.error("Status 'completed' no encontrado");
-      setSnack({ open: true, msg: "Error: Status 'completed' no encontrado. Ejecute 'npm run seed' en el backend." });
-      return;
-    }
+  if (!completedStatusId) {
+    console.error("No se encontró el status 'completed' en statuses");
+    setSnack({
+      open: true,
+      msg: "No se pudo obtener el status 'completed'. Intenta recargar la página.",
+    });
+    return;
+  }
 
-    try {
-      const res = await updateTransactionStatusService(
-        transaction._id,                         
-        completedStatus._id
-      );
+  try {
+    const res = await updateTransactionStatusService(
+      transaction._id,
+      completedStatusId // 👈 ahora viene de la BD
+    );
 
-      console.log("🚀 ~ doAccept ~ res:", res);
-      setLocalStatus("completed");
-      setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.` });
-      closeConfirm();
-      navigate(-1);
-    } catch (error) {
-      console.error("Error actualizando status:", error);
-      setSnack({ open: true, msg: "Error al actualizar la transacción" });
-      return;
-    }
-  };
+    console.log("Transacción actualizada:", res);
+
+    // Aquí puedes decidir si usar "paid" o "completed" para tu estado local
+    setLocalStatus("paid");
+
+    setSnack({
+      open: true,
+      msg: `Pago de ${transaction.wallet_id.user_id.name} aceptado.`,
+    });
+    closeConfirm();
+    navigate(-1);
+  } catch (error) {
+    console.error("Error actualizando status:", error);
+    setSnack({ open: true, msg: "Error al actualizar la transacción" });
+  }
+};
+
+
+const rejectedStatusId = React.useMemo(() => {
+  const status = statuses.find((s) => s.name === "rejected");
+  return status?._id || null;
+}, [statuses]);
 
   const doCancelPayment = async () => {
-    if (!transaction) return;
-       if (!transaction?._id) {
+    if (!transaction || !transaction._id) {
       console.error("No hay transactionId para actualizar");
-      return;
-    }
-
-    // Buscar el status "rejected"
-    const rejectedStatus = transactionStatuses.find(s => s.name.toLowerCase() === "rejected");
-    if (!rejectedStatus) {
-      console.error("Status 'rejected' no encontrado");
-      setSnack({ open: true, msg: "Error: Status 'rejected' no encontrado. Ejecute 'npm run seed' en el backend." });
       return;
     }
 
     try {
       const res = await updateTransactionStatusService(
-        transaction._id,                          
-        rejectedStatus._id
+        transaction._id,
+        rejectedStatusId // ID de status "rejected"
       );
 
-      console.log("Transacción actualizada:", res.transaction);
-      console.log("Wallet recalculada:", res.wallet);
+      console.log("Transacción actualizada:", res);
       setLocalStatus("rejected");
-      setSnack({ open: true, msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.` });
+      setSnack({
+        open: true,
+        msg: `Pago de ${transaction.wallet_id.user_id.name} cancelado.`,
+      });
       closeConfirm();
       navigate(-1);
     } catch (error) {
@@ -198,8 +231,11 @@ export default function UserPurchaseDetail() {
     }
   };
 
+  // const metadata = transaction?.metadata;
+
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
+      {/* Header */}
       <Stack
         direction="row"
         alignItems="center"
@@ -215,7 +251,13 @@ export default function UserPurchaseDetail() {
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
+        {/* Datos del usuario */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between" // 👈 separa izquierda / derecha
+        >
+          {/* IZQUIERDA: nombre + correo */}
           <Stack spacing={0.5}>
             <Typography variant="subtitle1" fontWeight={700}>
               {transaction?.wallet_id?.user_id?.name}
@@ -224,14 +266,25 @@ export default function UserPurchaseDetail() {
             <Typography variant="body2" color="text.secondary">
               {transaction?.wallet_id?.user_id?.email}
             </Typography>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-              <Chip size="small" label={`Estado: ${localStatus}`} color={statusColor} />
-            </Stack>
           </Stack>
+
+          {/* DERECHA: status */}
+          <Chip
+            size="small"
+            label={`Estado: ${localStatus}`}
+            color={statusColor}
+            sx={{ ml: 2 }}
+          />
         </Stack>
 
         <Divider sx={{ my: 2 }} />
 
+        {/* Fecha + estado */}
+
+
+        <Typography variant="subtitle2" sx={{ mb: 1.5, textAlign: "center" }} fontWeight={700}>
+          Detalles del pago móvil
+        </Typography>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={4}
@@ -244,25 +297,15 @@ export default function UserPurchaseDetail() {
             <Typography>{transaction?.metadata?.paidAt}</Typography>
           </Stack>
 
-          <Stack spacing={0.5}>
-            <Typography variant="caption" color="text.secondary">
-              Estado
-            </Typography>
-            <Typography sx={{ textTransform: "capitalize" }}>
-              {transaction?.status_id?.name}
-            </Typography>
-          </Stack>
-        </Stack>
 
-        <Typography variant="subtitle2" sx={{ mb: 1.5 }} fontWeight={700}>
-          Detalles del pago móvil
-        </Typography>
+        </Stack>
 
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2.5}
           alignItems={{ md: "flex-start" }}
         >
+          {/* Columna de texto */}
           <Stack spacing={1.25} sx={{ flex: 1, minWidth: 260 }}>
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
@@ -278,9 +321,7 @@ export default function UserPurchaseDetail() {
                 Monto ({transaction?.currency_id?.symbol ?? "Bs"})
               </Typography>
               <Typography fontWeight={600}>
-                {formatBs(
-                  Number(transaction?.metadata?.amount ?? "0")
-                )}
+                {formatBs(Number(transaction?.amount?.$numberDecimal ?? 0))}
               </Typography>
             </Stack>
 
@@ -295,11 +336,9 @@ export default function UserPurchaseDetail() {
 
             <Stack spacing={0.3}>
               <Typography variant="caption" color="text.secondary">
-                Cédula
+                Cédula / Documento
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.payerDocType}
-                {"-"}
                 {transaction?.metadata?.payerDocId}
               </Typography>
             </Stack>
@@ -314,6 +353,7 @@ export default function UserPurchaseDetail() {
             </Stack>
           </Stack>
 
+          {/* Comprobante */}
           <Box sx={{ flex: 1, width: "100%" }}>
             <Typography variant="caption" color="text.secondary">
               Comprobante
@@ -335,7 +375,7 @@ export default function UserPurchaseDetail() {
               {transaction?.metadata?.voucherPreview ? (
                 <Box
                   component="img"
-                  src={transaction.metadata.voucherPreview || undefined}
+                  src={transaction?.metadata.voucherPreview || undefined}
                   alt="Comprobante"
                   sx={{
                     maxWidth: "100%",
@@ -353,6 +393,7 @@ export default function UserPurchaseDetail() {
           </Box>
         </Stack>
 
+        {/* Botones de acción */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -378,6 +419,7 @@ export default function UserPurchaseDetail() {
         </Stack>
       </Paper>
 
+      {/* Diálogo aceptar */}
       <Dialog open={confirm === "accept"} onClose={closeConfirm}>
         <DialogTitle>Confirmar aceptación</DialogTitle>
         <DialogContent>
@@ -387,9 +429,7 @@ export default function UserPurchaseDetail() {
           Banco: <b>{transaction?.metadata?.bankName}</b> — Monto:{" "}
           <b>
             {transaction?.currency_id?.symbol ?? "Bs"}{" "}
-            {formatBs(
-              Number(transaction?.metadata?.amount ?? "0")
-            )}
+            {/* {formatBs(transaction?.amount?.$numberDecimal ?? 0)} */}
           </b>
           <br />
           Ref: <b>{transaction?.metadata?.refCode}</b>
@@ -402,6 +442,7 @@ export default function UserPurchaseDetail() {
         </DialogActions>
       </Dialog>
 
+      {/* Diálogo cancelar */}
       <Dialog open={confirm === "cancel"} onClose={closeConfirm}>
         <DialogTitle>Confirmar cancelación</DialogTitle>
         <DialogContent>
@@ -422,6 +463,7 @@ export default function UserPurchaseDetail() {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar */}
       <Snackbar
         open={snack.open}
         onClose={() => setSnack({ open: false, msg: "" })}
@@ -430,5 +472,8 @@ export default function UserPurchaseDetail() {
       />
     </Container>
   );
+}
+function setLoading(arg0: boolean) {
+  throw new Error("Function not implemented.");
 }
 

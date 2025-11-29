@@ -71,9 +71,9 @@ export default function Users() {
     setPage(0);
   };
 
-  const onView = (u: User) => {
+  const onView = (u: any) => {
     // navega a tu detalle (ajusta la ruta real cuando la tengas)
-    navigate(`/user-details/${u._id}`);
+    navigate(`/user-details/${u.id}`);
   };
 
   return (

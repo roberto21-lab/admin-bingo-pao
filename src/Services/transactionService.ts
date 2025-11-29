@@ -1,7 +1,7 @@
 // src/services/transactionService.ts
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Ajusta el tipo según tu modelo de Transaction en el backend
 export type Transaction = {
@@ -70,15 +70,6 @@ export async function getTransactionByIdService(id: string): Promise<Transaction
   return response.data;
 }
 
-
-// 🔹 Obtener status de transacciones
-export async function getTransactionStatusesService(): Promise<Array<{ _id: string; name: string; category: string }>> {
-  const url = `${API_URL}/statuses?category=transaction`;
-
-  const response = await axios.get<Array<{ _id: string; name: string; category: string }>>(url);
-
-  return response.data;
-}
 
 // 🔹 Actualizar el status de una transacción
 export async function updateTransactionStatusService(
