@@ -1,24 +1,36 @@
 import {
 	Alert,
+	Box,
 	Button,
 	Container,
+	Divider,
 	LinearProgress,
+	MenuItem,
 	Paper,
 	Stack,
-	Typography,
 	TextField,
-	Divider,
-	Box,
-	MenuItem,
+	Typography,
 } from "@mui/material";
 import * as React from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { createAdminTransactionService } from "../Services/transactionService";
 import { getUserById, updateUser, type User } from "../Services/users.service";
 import { getWalletByUser, type WalletResponse } from "../Services/wallet.service";
-import { createAdminTransactionService, updateTransactionStatusService, type CreateAdminTransactionPayload } from "../Services/transactionService";
 
 
 type EditableUserField = "name" | "email" | "document_number" | "phone" | "bank";
+
+
+const BANKS = [
+	"Banco de Venezuela",
+	"Banco Provincial",
+	"Banesco",
+	"Mercantil",
+	"BOD",
+	"Banco del Tesoro",
+	"Bancamiga",
+];
+
 
 export default function UserDetails() {
 	const { id } = useParams<{ id: string }>();
@@ -29,7 +41,6 @@ export default function UserDetails() {
 	const [loading, setLoading] = React.useState(true);
 	const [error, setError] = React.useState<string | null>(null);
 
-	// 🔹 estados locales para los campos editables
 	const [fieldValues, setFieldValues] = React.useState<Record<EditableUserField, string>>({
 		name: user?.name || "",
 		email: user?.email || "",
@@ -38,7 +49,6 @@ export default function UserDetails() {
 		bank: user?.bankAccount?.bank_name || "",
 	});
 
-	// 🔹 estados para la sección de wallet
 	const [walletOperation, setWalletOperation] = React.useState<"sumar" | "restar">("sumar");
 	const [walletAmount, setWalletAmount] = React.useState("");
 	const [walletNote, setWalletNote] = React.useState("");
@@ -68,12 +78,10 @@ export default function UserDetails() {
 		})();
 	}, [id]);
 
-	// 🔹 función genérica que "envía" la data al backend (por ahora solo consola)
 	const sendUpdate = (payload: any) => {
 		console.log("📤 Payload enviado al backend (simulado):", payload);
 	};
 
-	// 🔹 cambiar el valor de un campo de texto
 	const handleFieldChange = (field: EditableUserField, value: string) => {
 		setFieldValues((prev) => ({
 			...prev,
@@ -81,7 +89,6 @@ export default function UserDetails() {
 		}));
 	};
 
-	// 🔹 guardar un solo campo (Nombre, Email, etc.)
 	const handleFieldSave = (field: EditableUserField) => {
 		if (!id) return;
 
@@ -97,33 +104,11 @@ export default function UserDetails() {
 		sendUpdate(payload);
 	};
 
-	// 🔹 aplicar cambio de saldo de wallet (sumar / restar)
-	// const handleWalletSubmit = () => {
-	// 	if (!id) return;
-
-	// 	const numericAmount = Number(walletAmount);
-	// 	if (isNaN(numericAmount) || numericAmount <= 0) {
-	// 		console.warn("Monto inválido");
-	// 		return;
-	// 	}
-
-	// 	const payload = {
-	// 		userId: id,
-	// 		type: "wallet-transaction",
-	// 		operation: walletOperation,
-	// 		amount: numericAmount,
-	// 		note: walletNote,
-	// 		// más adelante aquí metes wallet_id, currency_id, etc.
-	// 	};
-
-	// 	sendUpdate(payload);
-	// };
-
 	const [wallet, setWallet] = React.useState<WalletResponse | null>(null);
 	const [walletError, setWalletError] = React.useState<string | null>(null);
 
 	React.useEffect(() => {
-		if (!id) return; // por si todavía no hay id en la URL
+		if (!id) return;
 
 		const fetchWallet = async () => {
 			try {
@@ -163,6 +148,7 @@ export default function UserDetails() {
 			name: fieldValues.name, // 👈 esto es lo que va al back
 		});
 		setUser(updated);
+		alert("Nombre actualizado con éxito");
 
 
 	};
@@ -173,35 +159,20 @@ export default function UserDetails() {
 
 		try {
 			const updated = await updateUser(user._id, {
-				email: fieldValues.email, // 👈 esto va al back
+				email: fieldValues.email,
 			});
 
 			setUser(updated);
+			// mandar alerta de éxito
+			alert("Correo actualizado con éxito");
 
-			// opcional: sincronizar por si el back lo modifica
-			// setFieldValues((prev) => ({
-			//   ...prev,
-			//   email: updated.email || prev.email,
-			// }));
-
-			// opcional: snackbar
-			// setSnack({
-			//   open: true,
-			//   msg: "Correo actualizado correctamente",
-			// });
 		} catch (error: any) {
 			console.error("Error actualizando correo:", error);
 
-			// si tu backend manda { message: "El email ya está registrado" }
 			const msg =
 				error?.response?.data?.message || "Error al actualizar el correo";
 
-			// opcional: snackbar
-			// setSnack({
-			//   open: true,
-			//   msg,
-			// });
-			alert(msg); // por ahora algo sencillo
+			alert(msg);
 		}
 	};
 
@@ -211,86 +182,100 @@ export default function UserDetails() {
 
 		try {
 			const updated = await updateUser(user._id, {
-				phone_number: fieldValues.phone,  // 👈 clave que espera el back
+				phone_number: fieldValues.phone,
+			});
+
+			setUser(updated);
+			// mandar alerta de éxito
+			alert("Teléfono actualizado con éxito");
+
+
+		} catch (error) {
+			console.error("Error actualizando teléfono:", error);
+
+		}
+	};
+
+	type WalletOperation = "sumar" | "restar";
+
+	const RECHARGE_TYPE_ID = "6929f2a6b0d38f1f0ce323ce"; // Recarga
+	const WITHDRAW_TYPE_ID = "6929f2a6b0d38f1f0ce323d1"; // Retiro
+
+	const TX_TYPE_BY_OPERATION: Record<WalletOperation, string> = {
+		sumar: RECHARGE_TYPE_ID,
+		restar: WITHDRAW_TYPE_ID,
+	};
+
+	const handleWalletSubmit = async () => {
+		if (!wallet || !wallet._id) {
+			console.error("No hay wallet para operar");
+			return;
+		}
+
+		const amountNumber = Number(walletAmount);
+
+		if (isNaN(amountNumber) || amountNumber <= 0) {
+			console.error("Monto inválido:", walletAmount);
+			return;
+		}
+
+		const currency_id =
+			typeof wallet.currency_id === "string"
+				? wallet.currency_id
+				: wallet.currency_id?._id;
+
+		if (!currency_id) {
+			console.error("No se pudo determinar currency_id desde la wallet");
+			return;
+		}
+
+		const transaction_type_id = TX_TYPE_BY_OPERATION[walletOperation];
+
+		try {
+			await createAdminTransactionService({
+				wallet_id: wallet._id,
+				transaction_type_id,
+				amount: amountNumber,
+				currency_id,
+
+			});
+
+
+			alert("Transacción creada con éxito");
+			setWalletAmount("");
+			setWalletNote("");
+
+			const updatedWallet = await getWalletByUser(wallet.user_id);
+			setWallet(updatedWallet);
+
+		} catch (error) {
+			console.error("Error creando transacción admin:", error);
+		}
+	};
+
+	const handleUpdateBank = async () => {
+		console.log("Actualizar banco a:", fieldValues.bank);
+		if (!user) return;
+
+		try {
+			const updated = await updateUser(user._id, {
+				bank_name: fieldValues.bank,   // 👈 esto es lo que espera el back
 			});
 
 			setUser(updated);
 
-			// opcional: sincronizar por si el back lo modifica
-			// setFieldValues((prev) => ({
-			//   ...prev,
-			//   phone: updated.profile?.phone_number || prev.phone,
-			// }));
-
-			// opcional: snackbar
-			// setSnack({
-			//   open: true,
-			//   msg: "Teléfono actualizado correctamente",
-			// });
+			alert("Banco actualizado con éxito");
 		} catch (error) {
-			console.error("Error actualizando teléfono:", error);
-			// setSnack({
-			//   open: true,
-			//   msg: "Error al actualizar el teléfono",
-			// });
+			console.error("Error actualizando banco:", error);
+			alert("Error al actualizar el banco");
 		}
 	};
 
 
-	// OJO: ajusta estos IDs con los de tu BD
-const RECHARGE_TYPE_ID = "ID_DEL_TRANSACTION_TYPE_RECHARGE"; // cámbialo por el real
-const WITHDRAW_TYPE_ID = "ID_DEL_TRANSACTION_TYPE_WITHDRAW"; // cámbialo por el real
-
-const handleWalletSubmit = async () => {
-  if (!wallet || !wallet._id) {
-    console.error("No hay wallet para operar");
-    // setSnack({ open: true, msg: "No se encontró la wallet del usuario." });
-    return;
-  }
-
-  const amountNumber = Number(walletAmount);
-
-  if (isNaN(amountNumber) || amountNumber <= 0) {
-    console.error("Monto inválido:", walletAmount);
-    // setSnack({ open: true, msg: "Ingresa un monto mayor a 0." });
-    return;
-  }
-
-  // currency_id puede venir como string o como objeto poblado
-  const currency_id =
-    typeof wallet.currency_id === "string"
-      ? wallet.currency_id
-      : wallet.currency_id?._id;
-
-  if (!currency_id) {
-    console.error("No se pudo determinar currency_id desde la wallet");
-    // setSnack({ open: true, msg: "No se pudo determinar la moneda de la wallet." });
-    return;
-  }
-
-  const transaction_type_id =
-    walletOperation === "sumar" ? RECHARGE_TYPE_ID : WITHDRAW_TYPE_ID;
-
-  try {
-    const res = await createAdminTransactionService({
-      wallet_id: wallet._id,
-      transaction_type_id: "6929f2a6b0d38f1f0ce323ce",
-      amount: amountNumber,
-      currency_id: "6929f2a1b0d38f1f0ce32374",
-    
-    });
-    console.log("🚀 ~ handleWalletSubmit ~ res:", res)
-
-    console.log("Transacción admin creada:", res.transaction);
-
-  } catch (error) {
-    console.error("Error creando transacción admin:", error);
-  }
-};
 
 
 	return (
-		<Container maxWidth="md" sx={{ py: 3 }}>
+		<Container sx={{ py: 3 }}>
 			<Stack
 				direction="row"
 				alignItems="center"
@@ -360,8 +345,7 @@ const handleWalletSubmit = async () => {
 							Datos del usuario
 						</Typography>
 
-						{/* Nombre */}
-						{/* Nombre */}
+
 						<Stack
 							direction="row"
 							spacing={2}
@@ -372,14 +356,14 @@ const handleWalletSubmit = async () => {
 								Nombre:
 							</Typography>
 							<TextField
-								size="small"
-								fullWidth
+								sx={{
+									width: "100%",
+								}}
 								value={fieldValues.name}
 								onChange={(e) => handleFieldChange("name", e.target.value)}
 							/>
 							<Button
 								variant="contained"
-								size="small"
 								onClick={() => handleUpdateName()}
 							>
 								Guardar
@@ -398,14 +382,14 @@ const handleWalletSubmit = async () => {
 								Correo:
 							</Typography>
 							<TextField
-								size="small"
-								fullWidth
+								sx={{
+									width: "100%",
+								}}
 								value={fieldValues.email}
 								onChange={(e) => handleFieldChange("email", e.target.value)}
 							/>
 							<Button
 								variant="contained"
-								size="small"
 								onClick={handleUpdateEmail}
 							>
 								Guardar
@@ -424,14 +408,14 @@ const handleWalletSubmit = async () => {
 								Cédula:
 							</Typography>
 							<TextField
-								size="small"
-								fullWidth
+								sx={{
+									width: "100%",
+								}}
 								value={fieldValues.document_number}
 								onChange={(e) => handleFieldChange("document_number", e.target.value)}
 							/>
 							<Button
 								variant="contained"
-								size="small"
 								onClick={() => handleUpdateCedula()}
 							>
 								Guardar
@@ -448,14 +432,14 @@ const handleWalletSubmit = async () => {
 								Teléfono:
 							</Typography>
 							<TextField
-								size="small"
-								fullWidth
+								sx={{
+									width: "100%",
+								}}
 								value={fieldValues.phone}
 								onChange={(e) => handleFieldChange("phone", e.target.value)}
 							/>
 							<Button
 								variant="contained"
-								size="small"
 								onClick={() => handleUpdatePhone()}
 							>
 								Guardar
@@ -463,6 +447,7 @@ const handleWalletSubmit = async () => {
 						</Stack>
 
 
+						{/* Banco */}
 						{/* Banco */}
 						<Stack
 							direction="row"
@@ -474,19 +459,27 @@ const handleWalletSubmit = async () => {
 								Banco:
 							</Typography>
 							<TextField
-								size="small"
-								fullWidth
-								value={user?.bankAccount?.bank_name || ""}
+								select                     // 👈 importante
+								sx={{
+									width: "100%",
+								}}
+								value={fieldValues.bank}
 								onChange={(e) => handleFieldChange("bank", e.target.value)}
-							/>
+							>
+								{BANKS.map((bank) => (
+									<MenuItem key={bank} value={bank}>
+										{bank}
+									</MenuItem>
+								))}
+							</TextField>
 							<Button
 								variant="contained"
-								size="small"
-								onClick={() => handleFieldSave("bank")}
+								onClick={handleUpdateBank}
 							>
 								Guardar
 							</Button>
 						</Stack>
+
 
 						{/* ---------------- DATOS DE LA WALLET ---------------- */}
 						<Divider sx={{ my: 2 }} />
@@ -494,31 +487,40 @@ const handleWalletSubmit = async () => {
 							Datos de la wallet
 						</Typography>
 
-						<Typography variant="body2" sx={{ mb: 1 }}>
-							Saldo actual:{" "}
-							<strong>
-								{wallet?.balance ?? 0}
-							</strong>{" "}
-							{wallet?.currency_id.code
-								|| "BS"}
-						</Typography>
+						<Box sx={{
+							display: "flex",
+							justifyContent: "space-between",
+							alignItems: "center",
+							mb: 2,
+						}}>
+							<Typography variant="body2" sx={{ mb: 1 }}>
+								Saldo actual:{" "}
+								<strong>
+									{wallet?.balance ?? 0}
+								</strong>{" "}
+								{wallet?.currency_id.code
+									|| "BS"}
+							</Typography>
 
-						<Typography variant="body2" sx={{ mb: 1 }}>
-							Saldo congelado:{" "}
-							<strong>
-								{wallet?.frozen_balance ?? 0}
-							</strong>{" "}
-							{wallet?.currency_id.code
-								|| "BS"}
-						</Typography>
+							<Typography variant="body2" sx={{ mb: 1 }}>
+								Saldo congelado:{" "}
+								<strong>
+									{wallet?.frozen_balance ?? 0}
+								</strong>{" "}
+								{wallet?.currency_id.code
+									|| "BS"}
+							</Typography>
 
-						<Stack spacing={1.5} sx={{ maxWidth: 600 }}>
+						</Box>
+
+
+						<Stack spacing={1.5} >
 							<Stack direction="row" spacing={1}>
 								<TextField
 									select
 									label="Operación"
 									size="small"
-									sx={{ width: 160 }}
+									sx={{ width: "300px" }}
 									value={walletOperation}
 									onChange={(e) =>
 										setWalletOperation(e.target.value as "sumar" | "restar")
@@ -550,7 +552,7 @@ const handleWalletSubmit = async () => {
 							<Box>
 								<Button
 									variant="contained"
-									size="small"
+									fullWidth
 									onClick={handleWalletSubmit}
 								>
 									Aplicar cambio de saldo
