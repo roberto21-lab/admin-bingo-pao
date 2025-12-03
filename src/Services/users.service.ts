@@ -8,12 +8,23 @@ export type CreateUserPayload = {
 };
 
 export type User = {
+  bankAccount: any;
+  profile: any;
   _id: string;
   name: string;
   email: string;
   created_at?: string;
   updated_at?: string;
 };
+
+export type UpdateUserPayload = {
+  name?: string;
+  email?: string;
+  document_number?: string; // cédula
+  bank_name?: string;
+  phone_number?: string;
+};
+
 
 export async function createUser(payload: CreateUserPayload): Promise<User> {
   const { data } = await api.post<{ success: boolean; data: User; message?: string }>(
@@ -32,7 +43,22 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function getUserById(id: string): Promise<User> {
-  const { data } = await api.get<{ success: boolean; data: User; message?: string }>(`/users/${id}`);
-  if (data?.success && data?.data) return data.data;
-  throw new Error(data?.message || "No se pudo obtener el usuario");
+  const { data } = await api.get<User>(`/users/${id}`);
+   return data;
 }
+
+export async function updateUser(
+  id: string,
+  payload: UpdateUserPayload
+): Promise<User> {
+  const { data } = await api.patch<{
+    success: boolean;
+    data: User;
+    message?: string;
+  }>(`/users/edit-user/${id}`, payload);
+
+  if (data?.success && data?.data) return data.data;
+
+  throw new Error(data?.message || "No se pudo actualizar el usuario");
+}
+

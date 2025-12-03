@@ -28,6 +28,16 @@ export type UpdateTransactionStatusResponse = {
   };
 };
 
+
+// payload extra opcional
+type UpdateTxExtraPayload = {
+  wallet_id?: string;
+  amount?: number;
+  note?: string;
+  operation?: "sumar" | "restar";
+  // cualquier otro campo que tu backend espere
+};
+
 export async function getTransactionsService(): Promise<Transaction[]> {
   const url = `${API_URL}/transactions`; // esta ruta debe estar montada sobre router.get("/")
 
@@ -60,29 +70,80 @@ export async function getWithdrawTransactionsService(): Promise<Transaction[]> {
 
 
 // 🔹 Obtener UNA transacción por ID
+// export async function getTransactionByIdService(id: string): Promise<Transaction> {
+//   const url = `${API_URL}/transactions/${id}`;
+
+//   const response = await axios.get<Transaction>(url, {
+//     headers: { Authorization: `Bearer ${token}` },
+//   });
+
+//   return response.data;
+// }
+
 export async function getTransactionByIdService(id: string): Promise<Transaction> {
   const url = `${API_URL}/transactions/${id}`;
+  const token = localStorage.getItem("token");
 
   const response = await axios.get<Transaction>(url, {
-    // headers: { Authorization: `Bearer ${token}` },
+    headers: token
+      ? { Authorization: `Bearer ${token}` }
+      : undefined,
   });
 
   return response.data;
 }
+
 
 
 // 🔹 Actualizar el status de una transacción
 export async function updateTransactionStatusService(
   id: string,
-  status_id: string
+  status_id: string,
+  extra?: UpdateTxExtraPayload
 ): Promise<UpdateTransactionStatusResponse> {
-  // OJO: ajusta la ruta a como la tengas definida en tu router:
-  // por ejemplo: router.patch("/transactions/:id/status", updateTransactionStatus);
   const url = `${API_URL}/transactions/${id}/status`;
 
-  const response = await axios.put<UpdateTransactionStatusResponse>(url, {
+  const body = {
     status_id,
+    ...(extra || {}), // 👈 merge de los campos extra
+  };
+
+  const response = await axios.put<UpdateTransactionStatusResponse>(url, body);
+
+  return response.data;
+}
+
+
+export type CreateAdminTransactionPayload = {
+  wallet_id: string;
+  transaction_type_id: string;
+  amount: number;              // número, en el back lo conviertes a Decimal128
+  currency_id: string;
+};
+
+// Tipo de respuesta del controlador createAdminTransaction
+export type CreateAdminTransactionResponse = {
+  success: boolean;
+  transaction: Transaction;
+};
+
+
+// 👇 tipo del payload para crear transacción admin
+
+
+// 👇 servicio que llama al endpoint createAdminTransaction
+export async function createAdminTransactionService(
+  payload: CreateAdminTransactionPayload
+): Promise<CreateAdminTransactionResponse> {
+  const url = `${API_URL}/transactions/admin`;
+  const token = localStorage.getItem("token");
+
+  const response = await axios.post<CreateAdminTransactionResponse>(url, payload, {
+    headers: token
+      ? { Authorization: `Bearer ${token}` }
+      : undefined,
   });
 
   return response.data;
 }
+

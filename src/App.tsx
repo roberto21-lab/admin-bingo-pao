@@ -4,14 +4,15 @@ import { Box, CssBaseline, Toolbar } from "@mui/material";
 import {
   Route,
   Routes,
-  useLocation,
-  Navigate,
+  useLocation
 } from "react-router-dom";
 
+import type { JSX } from "react";
 import Menu from "./components/Menu";
 import Home from "./Pages/Home";
 import LoadRequest from "./Pages/loadRequest";
 import Login from "./Pages/Login";
+import RecoverPassword from "./Pages/RecoverPassword";
 import Register from "./Pages/Register";
 import RoomDetails from "./Pages/RoomDetails";
 import Rooms from "./Pages/Rooms";
@@ -21,8 +22,6 @@ import Users from "./Pages/Users";
 import UserWithdraw from "./Pages/UserWithdraw";
 import WithdrawalRequest from "./Pages/WithdrawalRequest";
 import theme from "./theme";
-import { useAuth } from "./context/AuthContext";
-import type { JSX } from "react";
 
 function NotFound() {
   return (
@@ -33,35 +32,7 @@ function NotFound() {
   );
 }
 
-// 🔒 Ruta privada: solo accesible si hay usuario logueado
-// function PrivateRoute({ children }: { children: JSX.Element }) {
-//   const { isAuthenticated, initialized } = useAuth();
 
-//   // Mientras carga el contexto (lee localStorage), no hacemos nada.
-//   // Aquí puedes poner un spinner si quieres.
-//   if (!initialized) return null;
-
-//   if (!isAuthenticated) {
-//     return <Navigate to="/login" replace />;
-//   }
-
-//   return children;
-// }
-
-// // 🔓 Ruta pública (login): si ya está logueado, lo llevo al home
-// function PublicRoute({ children }: { children: JSX.Element }) {
-//   const { isAuthenticated, initialized } = useAuth();
-
-//   if (!initialized) return null;
-
-//   if (isAuthenticated) {
-//     return <Navigate to="/" replace />;
-//   }
-
-//   return children;
-// }
-
-// 🔒 Ruta privada: por ahora NO protege nada
 function PrivateRoute({ children }: { children: JSX.Element }) {
   return children;
 }
@@ -74,21 +45,15 @@ function PublicRoute({ children }: { children: JSX.Element }) {
 export default function App() {
   const location = useLocation();
 
-  // Mostrar/ocultar menú según la ruta
   const isLogin = location.pathname === "/login";
   const showMenu = !isLogin;
-  // si luego usas footer, lo puedes manejar con showFooter igual
-  // const showFooter = !isLogin;
 
-  // Debe coincidir con el ancho del Drawer en tu componente Menu
-  const drawerWidth = 260;
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
 
       <Box sx={{ display: "flex", minHeight: "100vh" }}>
-        {/* Menú lateral (md+) */}
         {showMenu && <Menu />}
 
         <Toolbar />
@@ -97,7 +62,6 @@ export default function App() {
           component="main"
           sx={{
             flexGrow: 1,
-            // si tu Menu desplaza el contenido: ml: { md: `${drawerWidth}px` },
           }}
         >
           <Routes>
@@ -191,6 +155,26 @@ export default function App() {
               element={
                 <PublicRoute>
                   <Login />
+                </PublicRoute>
+              }
+            />
+
+            RecoverPassword
+
+                 <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
+
+            <Route
+              path="/recover-password"
+              element={
+                <PublicRoute>
+                  <RecoverPassword />
                 </PublicRoute>
               }
             />
