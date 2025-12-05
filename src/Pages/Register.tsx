@@ -64,12 +64,18 @@ export default function RegisterUser() {
         password: string;
         confirmPassword: string;
         role: string;
+        phone: string;
+        document_number: string;
+        document_type: string;
     }>({
         name: "",
         email: "",
         password: "",
         confirmPassword: "",
+        phone: "",
         role: "",
+        document_number: "",
+        document_type: "",
     });
 
     const [roles, setRoles] = React.useState<Role[]>([]);
@@ -123,6 +129,10 @@ export default function RegisterUser() {
                 email: values.email.trim().toLowerCase(),
                 password: values.password,
                 role: values.role,        // 👈 aquí ya va el _id del rol
+                phone: values.phone,
+                document_number: values.document_number,
+                document_type_id: "6929f2a5b0d38f1f0ce323bc", // temporal
+                document_type: values.document_type,
             } as any);
 
             setSnack({ open: true, msg: "¡Usuario creado con éxito!" });
@@ -133,6 +143,9 @@ export default function RegisterUser() {
                 password: "",
                 confirmPassword: "",
                 role: defaultRoleId || "",  // 👈 volvemos al rol por defecto (user)
+                phone: "",
+                document_number: "",
+                document_type: "",
             });
 
             setTimeout(() => navigate("/users"), 600);
@@ -283,6 +296,63 @@ export default function RegisterUser() {
                             autoComplete="email"
                             error={!!errors.email}
                             helperText={errors.email || " "}
+                            sx={inputSx}
+                        />
+
+                         <TextField
+                            name="phone"
+                            label="Teléfono (opcional)"
+                            value={values.phone}
+                            onChange={onChange}
+                            fullWidth
+                            error={!!errors.phone}
+                            helperText={errors.phone || ' '}
+                            placeholder="Ej: 04121234567"
+                                sx={inputSx}
+
+                        />
+
+                        {/* tipo de documento */}
+                            {/* el tipo de documento deberia de ser un select */}
+                            <TextField
+                                select
+                                name="document_type"
+                                label="Tipo de documento"
+                                value={values.document_type}
+                                onChange={onChange}
+                                fullWidth
+                                error={!!errors.document_type}
+                                helperText={errors.document_type || " "}
+                                sx={inputSx}
+                            >
+                                <MenuItem value="DNI">DNI</MenuItem>
+                                <MenuItem value="CI">CI</MenuItem>
+                                <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                                <MenuItem value="Otro">Otro</MenuItem>
+                            </TextField>
+                        
+
+                        <TextField
+                            name="document_number"
+                            label="Número de documento"
+                            type="text"
+                            value={values.document_number}
+                            onChange={onChange}
+                            fullWidth
+                            error={!!errors.document_number}
+                            helperText={errors.document_number || " "}
+                            sx={inputSx}
+                        />
+
+                        <TextField
+                            name="document_type"
+                            label="Tipo de documento"
+                            type="text"
+                            value={values.document_type}
+                            onChange={onChange}
+                            fullWidth
+                            error={!!errors.document_type}
+                            helperText={errors.document_type || " "}
                             sx={inputSx}
                         />
 
