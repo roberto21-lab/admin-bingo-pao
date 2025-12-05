@@ -22,6 +22,8 @@ import Users from "./Pages/Users";
 import UserWithdraw from "./Pages/UserWithdraw";
 import WithdrawalRequest from "./Pages/WithdrawalRequest";
 import theme from "./theme";
+import ContactFormsList from "./Pages/ContactFormsList";
+import ContactFormDetail from "./Pages/ContactFormDetail";
 
 function NotFound() {
   return (
@@ -178,6 +180,20 @@ export default function App() {
                 </PublicRoute>
               }
             />
+
+            
+            <Route
+              path="/contact-forms"
+              element={
+                <PrivateRoute>
+                  <ContactFormsList />
+                </PrivateRoute>
+              }
+            />
+
+            <Route path="/contacts/:id" element={<ContactFormDetail />} />
+
+            ContactFormDetails
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

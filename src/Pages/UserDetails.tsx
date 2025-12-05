@@ -40,6 +40,7 @@ export default function UserDetails() {
 	console.log("🚀 ~ UserDetails ~ user:", user)
 	const [loading, setLoading] = React.useState(true);
 	const [error, setError] = React.useState<string | null>(null);
+	const [adminCode, setAdminCode] = React.useState("");
 
 	const [fieldValues, setFieldValues] = React.useState<Record<EditableUserField, string>>({
 		name: user?.name || "",
@@ -52,6 +53,7 @@ export default function UserDetails() {
 	const [walletOperation, setWalletOperation] = React.useState<"sumar" | "restar">("sumar");
 	const [walletAmount, setWalletAmount] = React.useState("");
 	const [walletNote, setWalletNote] = React.useState("");
+	const [refCode, setRefCode] = React.useState("");
 
 	React.useEffect(() => {
 		if (!id) return;
@@ -65,10 +67,11 @@ export default function UserDetails() {
 				setFieldValues({
 					name: data.name || "",
 					email: (data as any).email || "",
-					document_number: data?.profile?.document_number || "",
+					document_number: data?.bankAccount?.document_number || "",
 					phone: data?.bankAccount?.phone_number || "",
 					bank: data?.bankAccount?.bank_name || "",
 				});
+				setAdminCode(data.bankAccount?.admin_code || "");
 			} catch (err: any) {
 				// console.error("Error obteniendo usuario:", err);
 
@@ -206,52 +209,71 @@ export default function UserDetails() {
 		restar: WITHDRAW_TYPE_ID,
 	};
 
-	const handleWalletSubmit = async () => {
-		if (!wallet || !wallet._id) {
-			console.error("No hay wallet para operar");
-			return;
-		}
+const handleWalletSubmit = async () => {
+	const isAdminTransaction = true; // para que el backend sepa que es admin
 
-		const amountNumber = Number(walletAmount);
+  if (!wallet || !wallet._id) {
+    console.error("No hay wallet para operar");
+    return;
+  }
 
-		if (isNaN(amountNumber) || amountNumber <= 0) {
-			console.error("Monto inválido:", walletAmount);
-			return;
-		}
+  const amountNumber = Number(walletAmount);
 
-		const currency_id =
-			typeof wallet.currency_id === "string"
-				? wallet.currency_id
-				: wallet.currency_id?._id;
+  if (isNaN(amountNumber) || amountNumber <= 0) {
+    console.error("Monto inválido:", walletAmount);
+    return;
+  }
 
-		if (!currency_id) {
-			console.error("No se pudo determinar currency_id desde la wallet");
-			return;
-		}
+  const currency_id =
+    typeof wallet.currency_id === "string"
+      ? wallet.currency_id
+      : wallet.currency_id?._id;
 
-		const transaction_type_id = TX_TYPE_BY_OPERATION[walletOperation];
+  if (!currency_id) {
+    console.error("No se pudo determinar currency_id desde la wallet");
+    return;
+  }
 
-		try {
-			await createAdminTransactionService({
-				wallet_id: wallet._id,
-				transaction_type_id,
-				amount: amountNumber,
-				currency_id,
+  const transaction_type_id = TX_TYPE_BY_OPERATION[walletOperation];
 
-			});
+  // 👇 Aquí armamos tu metadata
+  const metadata = {
+    refCode: refCode || "",                     // si quieres, crea un estado refCode
+    bankName: fieldValues.bank || "",           // "Bancamiga", "Banesco", etc.
+    payerDocType: "V",                          // luego lo puedes volver dinámico
+    payerDocId: fieldValues.document_number || "",
+    payerPhone: fieldValues.phone || "",
+    amount: amountNumber.toString(),            // como string en metadata
+    paidAt: new Date().toISOString(),          // o un valor que elijas desde un input
+    notes: walletNote || "",
+    voucherPreview: null,
+    voucherFile: null,
+    // Extra opcional: info del admin que hizo el movimiento
+    // adminName: userAuth?.name,
+    // adminId: userAuth?.id,
+  };
 
+  try {
+    await createAdminTransactionService({
+      wallet_id: wallet._id,
+      transaction_type_id,
+      amount: amountNumber,
+      currency_id,
+      isAdminTransaction,             // para que el backend sepa que es admin
+      metadata,
+    });
 
-			alert("Transacción creada con éxito");
-			setWalletAmount("");
-			setWalletNote("");
+    alert("Transacción creada con éxito");
+    setWalletAmount("");
+    setWalletNote("");
 
-			const updatedWallet = await getWalletByUser(wallet.user_id);
-			setWallet(updatedWallet);
+    const updatedWallet = await getWalletByUser(wallet.user_id);
+    setWallet(updatedWallet);
+  } catch (error) {
+    console.error("Error creando transacción admin:", error);
+  }
+};
 
-		} catch (error) {
-			console.error("Error creando transacción admin:", error);
-		}
-	};
 
 	const handleUpdateBank = async () => {
 		console.log("Actualizar banco a:", fieldValues.bank);

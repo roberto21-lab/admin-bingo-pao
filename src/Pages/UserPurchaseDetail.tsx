@@ -69,6 +69,7 @@ type TransactionMetadata = {
 };
 
 type TransactionDetail = {
+  admin_code: string | null;
   _id: string;
   wallet_id: Wallet;
   transaction_type_id: {
@@ -89,13 +90,13 @@ type TransactionDetail = {
 export default function UserPurchaseDetail() {
   const { id } = useParams<{ id: string }>();
   const [transaction, setTransaction] = React.useState<TransactionDetail | null>(null);
+  console.log("🚀 ~ UserPurchaseDetail ~ transaction:", transaction)
   const [localStatus, setLocalStatus] = React.useState<PurchaseStatus>("pending");
   const [confirm, setConfirm] = React.useState<"accept" | "cancel" | null>(null);
   const [snack, setSnack] = React.useState({ open: false, msg: "" });
   const [statuses, setStatuses] = React.useState<any[]>([]);
   const [statusesLoading, setStatusesLoading] = React.useState(false);
-  console.log("🚀 ~ UserPurchaseDetail ~ statusesLoading:", statusesLoading)
-  console.log("🚀 ~ UserPurchaseDetail ~ statuses:", statuses)
+  
   const navigate = useNavigate();
 
 React.useEffect(() => {
@@ -349,6 +350,7 @@ const rejectedStatusId = React.useMemo(() => {
               </Typography>
               <Typography fontWeight={600}>
                 {transaction?.metadata?.refCode}
+                {transaction?.admin_code }
               </Typography>
             </Stack>
           </Stack>
@@ -433,6 +435,8 @@ const rejectedStatusId = React.useMemo(() => {
           </b>
           <br />
           Ref: <b>{transaction?.metadata?.refCode}</b>
+              <b>{transaction?.admin_code}</b>
+         
         </DialogContent>
         <DialogActions>
           <Button onClick={closeConfirm}>Cancelar</Button>

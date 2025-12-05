@@ -19,6 +19,8 @@ import PaidIcon from "@mui/icons-material/Paid";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import GroupIcon from "@mui/icons-material/Group";
+import ContactMailIcon from "@mui/icons-material/ContactMail";
 
 const drawerWidth = 260;
 
@@ -26,9 +28,12 @@ const items = [
   { label: "Crear sala", icon: <AddCircleIcon />, to: "/" },
   { label: "Listado de salas", icon: <ViewListIcon />, to: "/rooms" },
   { label: "Crear persona", icon: <PersonAddAlt1Icon />, to: "/register-user" },
+  { label: "Listado de usuarios", icon: <GroupIcon />, to: "/users" },
   { label: "Solicitud de recarga", icon: <AccountBalanceWalletIcon />, to: "/topup-requests" },
   { label: "Solicitud de retiro", icon: <PaidIcon />, to: "/withdraw-requests" },
+  { label: "Formularios de contacto", icon: <ContactMailIcon />, to: "/contact-forms" },
 ];
+
 
 export default function SideNav() {
   const location = useLocation();

@@ -69,16 +69,6 @@ export async function getWithdrawTransactionsService(): Promise<Transaction[]> {
 }
 
 
-// 🔹 Obtener UNA transacción por ID
-// export async function getTransactionByIdService(id: string): Promise<Transaction> {
-//   const url = `${API_URL}/transactions/${id}`;
-
-//   const response = await axios.get<Transaction>(url, {
-//     headers: { Authorization: `Bearer ${token}` },
-//   });
-
-//   return response.data;
-// }
 
 export async function getTransactionByIdService(id: string): Promise<Transaction> {
   const url = `${API_URL}/transactions/${id}`;
@@ -105,7 +95,7 @@ export async function updateTransactionStatusService(
 
   const body = {
     status_id,
-    ...(extra || {}), // 👈 merge de los campos extra
+    ...(extra || {}), 
   };
 
   const response = await axios.put<UpdateTransactionStatusResponse>(url, body);
@@ -119,6 +109,8 @@ export type CreateAdminTransactionPayload = {
   transaction_type_id: string;
   amount: number;              // número, en el back lo conviertes a Decimal128
   currency_id: string;
+  isAdminTransaction: boolean; // para que el backend sepa que es admin
+  metadata?: Record<string, any>;
 };
 
 // Tipo de respuesta del controlador createAdminTransaction
