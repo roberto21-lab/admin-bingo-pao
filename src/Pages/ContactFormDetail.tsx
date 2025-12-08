@@ -151,12 +151,6 @@ export default function ContactFormDetail() {
         {!loading && !error && form && (
           <>
             <Stack spacing={1.5}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="subtitle2" color="text.secondary">
-                  ID:
-                </Typography>
-                <Typography variant="body2">{form._id}</Typography>
-              </Stack>
 
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="subtitle2" color="text.secondary">
@@ -222,7 +216,7 @@ export default function ContactFormDetail() {
                 onClick={handleMarkAsAnswered}
                 disabled={form.status === "answered"}
               >
-                Marcar como respondido
+                Cambio de status
               </Button>
               <Button variant="outlined" onClick={handleNotifyUser}>
                 Enviar notificación al usuario

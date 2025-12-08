@@ -129,7 +129,7 @@ export default function RegisterUser() {
                 email: values.email.trim().toLowerCase(),
                 password: values.password,
                 role: values.role,        // 👈 aquí ya va el _id del rol
-                phone: values.phone,
+                // phone: values.phone,
                 document_number: values.document_number,
                 document_type_id: "6929f2a5b0d38f1f0ce323bc", // temporal
                 document_type: values.document_type,
@@ -299,7 +299,7 @@ export default function RegisterUser() {
                             sx={inputSx}
                         />
 
-                         <TextField
+                         {/* <TextField
                             name="phone"
                             label="Teléfono (opcional)"
                             value={values.phone}
@@ -310,7 +310,7 @@ export default function RegisterUser() {
                             placeholder="Ej: 04121234567"
                                 sx={inputSx}
 
-                        />
+                        /> */}
 
                         {/* tipo de documento */}
                             {/* el tipo de documento deberia de ser un select */}
@@ -344,17 +344,6 @@ export default function RegisterUser() {
                             sx={inputSx}
                         />
 
-                        <TextField
-                            name="document_type"
-                            label="Tipo de documento"
-                            type="text"
-                            value={values.document_type}
-                            onChange={onChange}
-                            fullWidth
-                            error={!!errors.document_type}
-                            helperText={errors.document_type || " "}
-                            sx={inputSx}
-                        />
 
                         {/* Select Rol */}
                         <TextField
