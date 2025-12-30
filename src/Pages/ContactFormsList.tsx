@@ -24,9 +24,9 @@ import {
   type ContactFormListItem,
 } from "../Services/contactForms.service";
 
-// Extiendo lo que viene del backend por si luego le agregas created_at
+// Row = lo que viene del backend
 type ContactFormRow = ContactFormListItem & {
-  created_at?: string; // opcional por ahora (tu controlador no lo manda)
+  created_at?: string;
 };
 
 export default function ContactFormsList() {
@@ -53,10 +53,8 @@ export default function ContactFormsList() {
         // page/limit aquí son del backend, independientes del paginado del front
         const data = await getContactForms({ page: 1, limit: 50 });
 
-        // Si luego en el back agregas created_at,
-        // aquí simplemente será parte de "data"
         setForms(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
         setError("Error al obtener formularios de contacto");
       } finally {
@@ -99,16 +97,26 @@ export default function ContactFormsList() {
     return d.toLocaleString();
   };
 
-  const translateStatus = (status: string) => {
-    switch (status) {
+  // 🔹 Acepta tanto string como objeto { _id, name }
+  const translateStatus = (status: string | { _id: string; name: string }) => {
+    const statusName =
+      typeof status === "string" ? status : status?.name;
+
+    if (!statusName) return "Sin estado";
+
+    switch (statusName) {
       case "pending":
         return "Pendiente";
       case "answered":
         return "Respondido";
       case "in_progress":
         return "En proceso";
+      case "completed":
+        return "Completado";
+      case "rejected":
+        return "Rechazado";
       default:
-        return status;
+        return statusName;
     }
   };
 
@@ -178,16 +186,21 @@ export default function ContactFormsList() {
                 </TableRow>
               ) : (
                 paged.map((f) => (
-                  <TableRow key={f._id} hover>
-                    <TableCell>{f.email}</TableCell>
-                    <TableCell>{f.title}</TableCell>
-                    <TableCell>{translateStatus(f.status)}</TableCell>
-                    {/* Por ahora, como el back no envía created_at, mostramos "-" */}
+                  <TableRow
+                    onClick={() => onView(f)}
+                    sx={{ cursor: "pointer" }}
+                    key={f?._id} hover>
+                    <TableCell>{f?.email}</TableCell>
+                    <TableCell>{f?.title}</TableCell>
+
+                    {/* 💡 Aquí ahora pasamos el objeto o string, y la función se encarga */}
+                    <TableCell>{translateStatus(f?.status)}</TableCell>
+
                     <TableCell>{formatDate(f.created_at)}</TableCell>
+
                     <TableCell align="right">
                       <IconButton
                         size="small"
-                        onClick={() => onView(f)}
                         aria-label="ver"
                       >
                         <VisibilityIcon fontSize="small" />

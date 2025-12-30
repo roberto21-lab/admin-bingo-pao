@@ -17,6 +17,8 @@ import {
   getContactFormById,
   type ContactFormDetail as ContactFormFromApi,
 } from "../Services/contactForms.service";
+  import { updateContactFormStatus } from "../Services/contactForms.service";
+
 
 type ContactFormStatus = "pending" | "answered" | "in_progress";
 
@@ -57,7 +59,7 @@ export default function ContactFormDetail() {
         // data tiene: _id, title, email, description, status, user_id
         // si en el futuro el back devuelve created_at, caerá aquí también
         setForm(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
         setError("Error al obtener el formulario");
       } finally {
@@ -107,19 +109,56 @@ export default function ContactFormDetail() {
     });
   };
 
-  const handleNotifyUser = () => {
-    if (!form) return;
-    // 🔹 Aquí luego llamarás al endpoint real de notificación
-    console.log("Enviar notificación al usuario:", form.email);
-    setSnackbar({
-      open: true,
-      message: "Notificación enviada al usuario (mock)",
-      severity: "info",
-    });
-  };
+
 
   const handleCloseSnackbar = () =>
     setSnackbar((prev) => ({ ...prev, open: false }));
+
+
+// Por ejemplo, podrías tenerlo hardcodeado mientras tanto:
+// const ANSWERED_STATUS_ID = "692a9c538ca688b935dcb0a8"; // 👈 reemplaza por el real aceptadas 
+const ANSWERED_STATUS_ID = "692a9c538ca688b935dcb0aa"; // 👈 reemplaza por el real rechazadas
+
+const handleNotifyUser = async () => {
+  if (!form) return;
+
+  try {
+    setLoading(true); // si no tienes loading, bórralo
+
+    // 🔹 Llamamos al backend para cambiar el estado
+    const updated = await updateContactFormStatus(form._id, ANSWERED_STATUS_ID);
+
+    // Si el servicio devuelve `contactForm` directo:
+    // setForm((prev) => (prev ? { ...prev, ...updated } : updated));
+
+    // Si el servicio devuelve { message, contactForm }:
+    // const { contactForm } = updated;
+    // setForm((prev) => (prev ? { ...prev, ...contactForm } : contactForm));
+
+    // Ejemplo asumiendo que el servicio devuelve data.contactForm:
+    setForm((prev) =>
+      prev
+        ? { ...prev, ...updated }
+        : updated
+    );
+
+    setSnackbar({
+      open: true,
+      message: "Estado actualizado y notificación enviada al usuario",
+      severity: "success",
+    });
+  } catch (error) {
+    console.error("Error actualizando estado del ContactForm:", error);
+    setSnackbar({
+      open: true,
+      message: "Error al actualizar el estado del formulario",
+      severity: "error",
+    });
+  } finally {
+    setLoading(false); // si no usas loading, bórralo
+  }
+};
+
 
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>

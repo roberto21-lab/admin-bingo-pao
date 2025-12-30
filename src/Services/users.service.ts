@@ -8,13 +8,22 @@ export type CreateUserPayload = {
 };
 
 export type User = {
-  bankAccount: any;
-  profile: any;
+
   _id: string;
   name: string;
   email: string;
   created_at?: string;
   updated_at?: string;
+};
+
+export type PaginatedUsersResponse = {
+  docs: User[];
+  page: number;        // 1-based :contentReference[oaicite:2]{index=2}
+  limit: number;
+  totalDocs: number;
+  totalPages: number;
+  next: number | null;
+  prev: number | null;
 };
 
 export type UpdateUserPayload = {
@@ -37,8 +46,18 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
 }
 
 
-export async function getUsers(): Promise<User[]> {
-  const { data } = await api.get<User[]>("/users"); // tu back devuelve [] plano
+// export async function getUsers(): Promise<User[]> {
+//   const { data } = await api.get<User[]>("/users"); // tu back devuelve [] plano
+//   return data;
+// }
+export async function getUsers(params?: {
+  page?: number;
+  limit?: number;
+  query?: string;
+}): Promise<PaginatedUsersResponse> {
+  const { data } = await api.get<PaginatedUsersResponse>("/users", {
+    params,
+  });
   return data;
 }
 

@@ -23,6 +23,16 @@ export type ContactFormDetail = ContactFormListItem & {
   description: string;
 };
 
+
+export type UpdateContactFormStatusResponse = {
+  message: string;
+  contactForm: ContactFormDetail & {
+    admin_note?: string;
+    created_at: string;
+    updated_at: string;
+    status_id: string;
+  };
+};
 /**
  * Obtiene el listado de formularios de contacto.
  * El backend devuelve un array plano con objetos como:
@@ -48,21 +58,28 @@ export async function getContactForms(params?: {
   return data; // el controlador ya devuelve [] directo
 }
 
-/**
- * Obtiene el detalle de un formulario de contacto por ID.
- *
- * Controller: getContactFormById
- * Ruta asumida: GET /contact-forms/:id
- *
- * Respuesta:
- * {
- *   _id, title, email, description, status,
- *   user_id: { _id, name, email } | null
- * }
- */
+
 export async function getContactFormById(
   id: string
 ): Promise<ContactFormDetail> {
   const { data } = await api.get<ContactFormDetail>(`/contacts/${id}`);
   return data;
+}
+
+
+export async function updateContactFormStatus(
+  id: string,
+  status_id: string
+): Promise<ContactFormDetail & {
+  admin_note?: string;
+  created_at: string;
+  updated_at: string;
+  status_id: string;
+}> {
+  const { data } = await api.patch<UpdateContactFormStatusResponse>(
+    `/contacts/${id}`,
+    { status_id }
+  );
+
+  return data.contactForm;
 }

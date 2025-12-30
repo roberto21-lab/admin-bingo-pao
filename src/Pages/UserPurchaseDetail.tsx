@@ -57,10 +57,10 @@ type TransactionStatus = {
 };
 
 type TransactionMetadata = {
-  bankName: string;
+  bank_name: string;
   documentTypeId: string;
-  payerDocId: string;
-  payerPhone: string;
+  document_number: string;
+  phone_number: string;
   amount: number;          // en tu JSON viene como number
   refCode: string;
   paidAt: string;
@@ -313,7 +313,7 @@ const rejectedStatusId = React.useMemo(() => {
                 Banco
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.bankName}
+                {transaction?.metadata?.bank_name}
               </Typography>
             </Stack>
 
@@ -331,7 +331,7 @@ const rejectedStatusId = React.useMemo(() => {
                 Teléfono (Pago móvil)
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.payerPhone}
+                {transaction?.metadata?.phone_number}
               </Typography>
             </Stack>
 
@@ -340,7 +340,7 @@ const rejectedStatusId = React.useMemo(() => {
                 Cédula / Documento
               </Typography>
               <Typography fontWeight={600}>
-                {transaction?.metadata?.payerDocId}
+                {transaction?.metadata?.document_number}
               </Typography>
             </Stack>
 
@@ -428,7 +428,7 @@ const rejectedStatusId = React.useMemo(() => {
           ¿Confirmas que el pago de{" "}
           <b>{transaction?.wallet_id?.user_id?.name}</b> es válido?
           <br />
-          Banco: <b>{transaction?.metadata?.bankName}</b> — Monto:{" "}
+          Banco: <b>{transaction?.metadata?.bank_name}</b> — Monto:{" "}
           <b>
             {transaction?.currency_id?.symbol ?? "Bs"}{" "}
             {/* {formatBs(transaction?.amount?.$numberDecimal ?? 0)} */}
@@ -477,7 +477,5 @@ const rejectedStatusId = React.useMemo(() => {
     </Container>
   );
 }
-function setLoading(arg0: boolean) {
-  throw new Error("Function not implemented.");
-}
+
 

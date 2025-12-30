@@ -34,21 +34,50 @@ export default function Users() {
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
 
+  const [totalDocs, setTotalDocs] = React.useState(0);
+  console.log("🚀 ~ Users ~ totalDocs:", totalDocs)
+
+
+  // React.useEffect(() => {
+  //   (async () => {
+  //     try {
+  //       setLoading(true);
+  //       const data = await getUsers();
+  //       setRows(data.docs);
+  //     } catch (err: any) {
+  //       setError(err?.response?.data?.message || err?.message || "Error al obtener usuarios");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   })();
+  // }, []);
+
+  // filtro cliente por nombre o email
+
   React.useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const data = await getUsers();
-        setRows(data);
+
+        const data = await getUsers({
+          page: page + 1,      // backend 1-based
+          limit: rowsPerPage,
+          query,
+        });
+
+        setRows(data.docs);
+        setTotalDocs(data.totalDocs);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         setError(err?.response?.data?.message || err?.message || "Error al obtener usuarios");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [page, rowsPerPage, query]);
 
-  // filtro cliente por nombre o email
+
+
   const filtered = React.useMemo(() => {
     if (!query.trim()) return rows;
     const q = query.toLowerCase();
@@ -60,10 +89,10 @@ export default function Users() {
   }, [rows, query]);
 
   // paginado
-  const paged = React.useMemo(() => {
-    const start = page * rowsPerPage;
-    return filtered.slice(start, start + rowsPerPage);
-  }, [filtered, page, rowsPerPage]);
+  // const paged = React.useMemo(() => {
+  //   const start = page * rowsPerPage;
+  //   return filtered.slice(start, start + rowsPerPage);
+  // }, [filtered, page, rowsPerPage]);
 
   const handleChangePage = (_: unknown, newPage: number) => setPage(newPage);
   const handleChangeRowsPerPage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,6 +100,7 @@ export default function Users() {
     setPage(0);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onView = (u: any) => {
     // navega a tu detalle (ajusta la ruta real cuando la tengas)
     navigate(`/user-details/${u.id}`);
@@ -127,12 +157,14 @@ export default function Users() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paged.map((u) => (
-                  <TableRow key={u._id} hover>
+                rows.map((u) => (
+                  <TableRow sx={{
+                    cursor: "pointer"
+                  }} onClick={() => onView(u)} key={u._id} hover>
                     <TableCell>{u.name}</TableCell>
                     <TableCell>{u.email}</TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={() => onView(u)} aria-label="ver">
+                      <IconButton size="small"  aria-label="ver">
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
@@ -145,7 +177,7 @@ export default function Users() {
 
         <TablePagination
           component="div"
-          count={filtered.length}
+          count={totalDocs}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
@@ -153,6 +185,7 @@ export default function Users() {
           rowsPerPageOptions={[5, 10, 20, 50]}
           labelRowsPerPage="Filas por página"
         />
+
       </Paper>
     </Container>
   );

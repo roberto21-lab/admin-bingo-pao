@@ -9,7 +9,7 @@ export type Status = {
   name: string;
   category: string;
 };
-let url = `/statuses`;
+const url = `/statuses`;
 
 export async function getStatusesService(): Promise<Status[]> {
 const { data } = await api.get<Status[]>(`${url}`);

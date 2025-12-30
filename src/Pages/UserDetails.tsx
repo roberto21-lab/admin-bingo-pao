@@ -66,12 +66,14 @@ export default function UserDetails() {
 				// cuando llegue el usuario, seteamos los valores iniciales de los campos
 				setFieldValues({
 					name: data.name || "",
-					email: (data as any).email || "",
+					email: (data ).email || "",
 					document_number: data?.bankAccount?.document_number || "",
 					phone: data?.bankAccount?.phone_number || "",
 					bank: data?.bankAccount?.bank_name || "",
 				});
 				setAdminCode(data.bankAccount?.admin_code || "");
+
+
 			} catch (err: any) {
 				// console.error("Error obteniendo usuario:", err);
 
@@ -81,6 +83,7 @@ export default function UserDetails() {
 		})();
 	}, [id]);
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const sendUpdate = (payload: any) => {
 		console.log("📤 Payload enviado al backend (simulado):", payload);
 	};
@@ -169,11 +172,10 @@ export default function UserDetails() {
 			// mandar alerta de éxito
 			alert("Correo actualizado con éxito");
 
-		} catch (error: any) {
+		} catch (error) {
 			console.error("Error actualizando correo:", error);
 
-			const msg =
-				error?.response?.data?.message || "Error al actualizar el correo";
+			const msg = "Error al actualizar el correo";
 
 			alert(msg);
 		}
@@ -330,7 +332,7 @@ const handleWalletSubmit = async () => {
 						</Typography>
 
 						<Stack direction="row" spacing={1}>
-							<Button
+							{/* <Button
 								variant="contained"
 								color="primary"
 								size="small"
@@ -339,18 +341,8 @@ const handleWalletSubmit = async () => {
 								}}
 							>
 								{seeForm ? "Ocultar formulario" : "Editar"}
-							</Button>
-							<Button
-								variant="outlined"
-								color="error"
-								size="small"
-								onClick={() => {
-									// por ahora no hace nada
-									console.log("🗑️ Aquí iría la lógica para eliminar usuario");
-								}}
-							>
-								Eliminar
-							</Button>
+							</Button> */}
+						
 						</Stack>
 					</>
 				)}
@@ -359,8 +351,7 @@ const handleWalletSubmit = async () => {
 					<Typography>No se encontró el usuario.</Typography>
 				)}
 
-				{seeForm && user && (
-					<Box sx={{ mt: 3 }}>
+				<Box sx={{ mt: 3 }}>
 						<Divider sx={{ mb: 2 }} />
 
 						<Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
@@ -583,8 +574,19 @@ const handleWalletSubmit = async () => {
 						</Stack>
 
 					</Box>
-				)}
 			</Paper>
+				<Button
+								variant="outlined"
+								color="error"
+								fullWidth
+								size="small"
+								onClick={() => {
+									// por ahora no hace nada
+									console.log("🗑️ Aquí iría la lógica para eliminar usuario");
+								}}
+							>
+								Eliminar
+							</Button>
 		</Container>
 	);
 }
